@@ -35,6 +35,11 @@ public class PlayerAnim : MonoBehaviour
 
     void HandleMovement()
     {
+        if (player.IsAttackBasic)
+        {
+            anim.SetTrigger("isAttackBasic");
+        }
+
         if (player.Direction.sqrMagnitude > 0.01f)
         {
             anim.SetInteger("transition", 2);
@@ -42,6 +47,7 @@ public class PlayerAnim : MonoBehaviour
             idleTimer = 0f;
             isIdlePlaying = false;
         }
+
         else
         {
             // Só seta idle-padrão se NÃO estiver rodando a animação especial
