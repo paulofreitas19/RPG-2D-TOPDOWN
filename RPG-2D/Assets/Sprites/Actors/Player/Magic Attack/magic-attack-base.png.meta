@@ -103,10 +103,10 @@ TextureImporter:
       name: magic-attack-base_0
       rect:
         serializedVersion: 2
-        x: 11
-        y: 24
-        width: 838
-        height: 1245
+        x: 0
+        y: 0
+        width: 700
+        height: 800
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: a1a6d453fa2f24845bd451c05ef338de
     internalID: 0
     vertices: []
     indices: 
