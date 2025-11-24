@@ -103,9 +103,9 @@ TextureImporter:
       name: attack3_0
       rect:
         serializedVersion: 2
-        x: 22
+        x: 0
         y: 0
-        width: 478
+        width: 500
         height: 717
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -113,9 +113,9 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 8ad8d6e15ab1a0b40800000000000000
+      spriteID: 719f57db9c5ea814aa941fa90e6bebf9
       internalID: 5407164698605751720
       vertices: []
       indices: 
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 841dfada0e8f9bb41aae9420900ccc3f
     internalID: 0
     vertices: []
     indices: 
