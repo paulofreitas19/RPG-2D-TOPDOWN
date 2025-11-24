@@ -353,7 +353,7 @@ GameObject:
   - component: {fileID: 1068883253}
   - component: {fileID: 1068883252}
   m_Layer: 0
-  m_Name: Mage
+  m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -372,6 +372,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 1.7
+  initialSpeed: 0
 --- !u!61 &1068883253
 BoxCollider2D:
   m_ObjectHideFlags: 0
