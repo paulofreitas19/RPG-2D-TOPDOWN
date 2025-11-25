@@ -16,9 +16,11 @@ public class Player : MonoBehaviour
     [Header("Control")]
 
     private Vector2 direction;
-    private bool isAttackBasic;
+    private bool isBasicAttack;
+    private bool isMagicAttack;
 
     #region Properties
+
 
     public Vector2 Direction
     {
@@ -26,10 +28,16 @@ public class Player : MonoBehaviour
         set { direction = value; }
     }
 
-    public bool IsAttackBasic
+    public bool IsBasicAttack
     {
-        get { return isAttackBasic; }
-        set { isAttackBasic = value; }
+        get { return isBasicAttack; }
+        set { isBasicAttack = value; }
+    }
+
+    public bool IsMagicAttack
+    {
+        get { return isMagicAttack; }
+        set { isMagicAttack = value; }
     }
 
     #endregion
@@ -49,7 +57,8 @@ public class Player : MonoBehaviour
     void Update()
     {
         OnDirectionInput();
-        OnAttackBasic();
+        OnBasicAttack();
+        OnMagicAttack();
     }
 
     private void FixedUpdate()
@@ -69,17 +78,32 @@ public class Player : MonoBehaviour
         rig.MovePosition(rig.position + direction * speed * Time.fixedDeltaTime);
     }
 
-    void OnAttackBasic()
+    void OnBasicAttack()
     {
         if (Input.GetMouseButtonDown(0))
         {
-            isAttackBasic = true;
+            isBasicAttack = true;
             speed = 0;
         }
 
         if (Input.GetMouseButtonUp(0))
         {
-            isAttackBasic = false;
+            isBasicAttack = false;
+            speed = initialSpeed;
+        }
+    }
+
+    void OnMagicAttack()
+    {
+        if (Input.GetMouseButtonDown(1))
+        {
+            isMagicAttack = true;
+            speed = 0;
+        }
+
+        if (Input.GetMouseButtonUp(1))
+        {
+            isMagicAttack = false;
             speed = initialSpeed;
         }
     }

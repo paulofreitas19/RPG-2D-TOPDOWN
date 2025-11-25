@@ -35,9 +35,14 @@ public class PlayerAnim : MonoBehaviour
 
     void HandleMovement()
     {
-        if (player.IsAttackBasic)
+        if (player.IsBasicAttack)
         {
-            anim.SetTrigger("isAttackBasic");
+            anim.SetTrigger("isBasicAttack");
+        }
+
+        if (player.IsMagicAttack)
+        {
+            anim.SetTrigger("isMagicAttack");
         }
 
         if (player.Direction.sqrMagnitude > 0.01f)
