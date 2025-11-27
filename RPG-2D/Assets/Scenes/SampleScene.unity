@@ -367,7 +367,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 822544791}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 7.04, y: 4.04, z: 0.07002708}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -388,17 +388,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   detectRadius: 4
-  stopDistance: 1.6
+  stopDistance: 1.2
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
-  moveSpeed: 1.2
+  moveSpeed: 1.5
   pathPoints:
   - {fileID: 1774968698}
   - {fileID: 1492587956}
   - {fileID: 1816567167}
   - {fileID: 1134699782}
-  waitTime: 6
+  waitTime: 10
 --- !u!61 &822544794
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -574,7 +574,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.32905167, y: 0.039089918}
+  m_Offset: {x: 0.43957657, y: 0.039089918}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -584,7 +584,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1.4617585, y: 2.1205783}
+  m_Size: {x: 1.2639772, y: 2.1205783}
   m_EdgeRadius: 0
 --- !u!50 &1068883254
 Rigidbody2D:
@@ -809,7 +809,7 @@ Transform:
   m_GameObject: {fileID: 1492587955}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 8.75, y: 1.16, z: 0}
+  m_LocalPosition: {x: 6.49, y: 0.43, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -935,7 +935,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1676055098}
   m_Layer: 0
-  m_Name: -> Enemies
+  m_Name: ----- Enemies
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1012,7 +1012,7 @@ Transform:
   m_GameObject: {fileID: 1816567166}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.22, y: 2.19, z: 0}
+  m_LocalPosition: {x: 3.38, y: 2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1028,7 +1028,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2036931721}
   m_Layer: 0
-  m_Name: Enemies -> Slime
+  m_Name: Group Slime
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

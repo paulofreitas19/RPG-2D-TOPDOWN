@@ -69,7 +69,7 @@ public class Slime : MonoBehaviour
         if (distance <= stopDistance)
         {
             SetTransition(State.Attack);
-            transform.localScale = new Vector2(2, 2);
+            transform.localScale = new Vector2(1.6f, 1.6f);
             rb.linearVelocity = Vector2.zero;
             return;
         }
@@ -140,6 +140,7 @@ public class Slime : MonoBehaviour
         currentState = newState;
         anim.SetInteger("transition", (int)newState);
     }
+
 
     // =============================================
     // VISUAL DEBUG
