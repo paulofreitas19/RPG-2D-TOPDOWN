@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 5964af082edaf7a47a179276192dee40
+guid: 538d32b481e52714c8214bd81f435acf
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4618772470127185045
-    second: slime-attacknovo3_0
+      213: 775994108973858432
+    second: sslime-attacknovo3_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: slime-attacknovo3_0
+      name: sslime-attacknovo3_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1536
-        height: 1024
+        x: 35
+        y: 75
+        width: 927
+        height: 878
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: b6337b3e8e2d6efb0800000000000000
-      internalID: -4618772470127185045
+      spriteID: 08ebe2dd782e4ca00800000000000000
+      internalID: 775994108973858432
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: e9b4d529e9c04c44e8e49d2289b71121
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      slime-attacknovo3_0: -4618772470127185045
+      sslime-attacknovo3_0: 775994108973858432
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
