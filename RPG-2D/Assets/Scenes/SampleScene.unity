@@ -439,7 +439,7 @@ GameObject:
   - component: {fileID: 822544794}
   - component: {fileID: 822544795}
   - component: {fileID: 822544793}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Slime
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -638,12 +638,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bcbc3ecc4db586488c6dfb741f364f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rb: {fileID: 0}
-  spriteRenderer: {fileID: 0}
-  playerAnim: {fileID: 0}
+  rb: {fileID: 1068883254}
+  playerAnim: {fileID: 1483056671}
+  mainCamera: {fileID: 519420031}
   moveSpeed: 3
+  arriveThreshold: 0.05
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  attackRange: 1.5
+  attackCooldown: 1
+  attackDamage: 10
+  autoAttackEnabled: 1
   maxHealth: 100
-  invulnerabilityTime: 0.6
 --- !u!61 &1068883253
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -887,8 +894,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 243cb23241b31d146b22e8d3caaaf297, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  idleTimer: 0
-  idleInterval: 3.5
+  animator: {fileID: 1483056668}
+  spriteRenderer: {fileID: 1483056669}
 --- !u!1 &1492587955
 GameObject:
   m_ObjectHideFlags: 0
