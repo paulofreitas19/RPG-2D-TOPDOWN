@@ -1,473 +1,519 @@
-using UnityEngine;
+ï»¿using UnityEngine;
+using System.Collections;
 
 /// <summary>
-/// Controla toda a lógica do jogador em um RPG top-down estilo Lineage2:
-/// - Movimento por clique (click-to-move).
-/// - Sistema de target em inimigos.
-/// - Sistema de auto-attack com cooldown.
-/// - Chamadas para o sistema de animação do Player.
-/// - Sistema de vida e dano básico.
+/// Controla o player no estilo Lineage2 / Perfect World:
+/// - Movimento por clique (click-to-move)
+/// - Sistema de target (clique / TAB)
+/// - Ataque bÃ¡sico e skills em F1/F2 com cooldown e cast
+/// - Auto-approach atÃ© alcance da skill
+/// - Combat Mode
 /// </summary>
 public class Player : MonoBehaviour
 {
-    //======================================================================
+    //==========================================================
     //  COMPONENTES
-    //======================================================================
+    //==========================================================
 
-    /// <summary>
-    /// Referência para o Rigidbody2D responsável pelo movimento físico.
-    /// </summary>
     [Header("Componentes")]
-    [SerializeField] private Rigidbody2D rb;
+    [SerializeField] private Rigidbody2D rb;          // MovimentaÃ§Ã£o fÃ­sica 2D.
+    [SerializeField] private PlayerAnim playerAnim;   // Controlador de animaÃ§Ã£o.
+    [SerializeField] private EnemyHUDController enemyHud; // Para acender as esferas.
 
-    /// <summary>
-    /// Referência para o script responsável pelas animações do player.
-    /// </summary>
-    [SerializeField] private PlayerAnim playerAnim;
+    private Camera mainCam;
 
-    /// <summary>
-    /// Câmera principal usada para converter posição da tela em mundo.
-    /// </summary>
-    [SerializeField] private Camera mainCamera;
-
-    //======================================================================
+    //==========================================================
     //  MOVIMENTO (CLICK-TO-MOVE)
-    //======================================================================
+    //==========================================================
 
-    /// <summary>
-    /// Velocidade de movimento do player em unidades por segundo.
-    /// </summary>
     [Header("Movimento")]
-    [SerializeField] private float moveSpeed = 3f;
+    [SerializeField] private float moveSpeed = 3f;        // Velocidade de caminhada.
+    [SerializeField] private float stoppingDistance = 0.1f; // DistÃ¢ncia mÃ­nima para considerar que chegou no ponto.
 
     /// <summary>
-    /// Ponto do mundo para onde o player deve se mover (destino atual).
+    /// Ponto alvo de movimento atual (no chÃ£o).
     /// </summary>
-    private Vector2 moveTarget;
+    private Vector3? moveDestination = null;
 
     /// <summary>
-    /// Flag indicando se existe ou não um destino de movimento ativo.
+    /// Se estÃ¡ em movimento automÃ¡tico (indo a um destino ou aproximando-se do alvo).
     /// </summary>
-    private bool hasMoveTarget = false;
+    private bool isAutoMoving = false;
+
+    //==========================================================
+    //  TARGET & INPUT DE MOUSE
+    //==========================================================
+
+    [Header("Target / Input")]
+    [SerializeField] private LayerMask groundMask;   // Layer do chÃ£o (para Raycast).
+    [SerializeField] private LayerMask enemyMask;    // Layer de inimigos (para Raycast).
+    [SerializeField] private float tabSearchRadius = 20f;  // Raio para achar inimigo mais prÃ³ximo no TAB.
+    [SerializeField] private float maxTargetDistanceToKeep = 25f; // DistÃ¢ncia mÃ¡xima para manter o target (extra seguranÃ§a).
 
     /// <summary>
-    /// Distância mínima até o destino para considerar que "chegou".
+    /// Tempo mÃ¡ximo entre cliques para considerar duplo clique.
     /// </summary>
-    [SerializeField] private float arriveThreshold = 0.05f;
+    [SerializeField] private float doubleClickThreshold = 0.25f;
 
-    //======================================================================
-    //  COMBATE / TARGET / AUTO-ATTACK
-    //======================================================================
+    private float lastClickTime = -999f;
+    private ITargetable lastClickedTarget = null;
+
+    //==========================================================
+    //  SKILLS E ATAQUE
+    //==========================================================
+
+    [System.Serializable]
+    public class SkillSlot
+    {
+        [Header("IdentificaÃ§Ã£o")]
+        public string skillName = "Skill";
+
+        [Header("Tecla")]
+        public KeyCode key = KeyCode.F1;
+
+        [Header("Combate")]
+        public float range = 1.7f;     // Alcance da skill.
+        public float cooldown = 2f;    // Tempo entre usos.
+        public float castTime = 0.3f;  // Tempo de conjuraÃ§Ã£o.
+        public int damage = 10;        // Dano da skill.
+
+        [HideInInspector] public float lastUseTime = -999f;
+    }
+
+    [Header("Skills")]
+    [SerializeField] private SkillSlot basicAttack; // Usada no duplo clique.
+    [SerializeField] private SkillSlot[] skills;    // Skills de F1, F2, F3...
 
     /// <summary>
-    /// Camada usada para detectar inimigos quando clicamos neles.
+    /// Se estÃ¡ conjurando alguma skill no momento.
     /// </summary>
-    [Header("Combate / Target")]
-    [SerializeField] private LayerMask enemyLayer;
+    private bool isCasting = false;
 
     /// <summary>
-    /// Alcance máximo para que o ataque corpo-a-corpo acerte o alvo.
+    /// Skill pendente de ser executada assim que chegar no alcance.
     /// </summary>
-    [SerializeField] private float attackRange = 1.5f;
+    private SkillSlot pendingSkill = null;
 
     /// <summary>
-    /// Tempo em segundos entre um ataque e outro (cooldown do auto-attack).
+    /// Alvo no momento em que a skill foi iniciada.
     /// </summary>
-    [SerializeField] private float attackCooldown = 1.0f;
+    private ITargetable pendingSkillTarget = null;
 
-    /// <summary>
-    /// Dano causado pelo ataque básico do player.
-    /// </summary>
-    [SerializeField] private int attackDamage = 10;
+    //==========================================================
+    //  VIDA / COMBATE
+    //==========================================================
 
-    /// <summary>
-    /// Referência para o alvo atual (inimigo selecionado).
-    /// </summary>
-    private EnemyBase currentTarget;
-
-    /// <summary>
-    /// Momento em que o último ataque foi executado (em segundos desde o início do jogo).
-    /// </summary>
-    private float lastAttackTime = -999f;
-
-    /// <summary>
-    /// Se verdadeiro, o player executa ataques automáticos
-    /// enquanto tiver um alvo em alcance.
-    /// </summary>
-    [SerializeField] private bool autoAttackEnabled = true;
-
-    //======================================================================
-    //  VIDA / DANO
-    //======================================================================
-
-    /// <summary>
-    /// Vida máxima do player.
-    /// </summary>
-    [Header("Vida")]
+    [Header("Vida & Dano")]
     [SerializeField] private int maxHealth = 100;
-
-    /// <summary>
-    /// Vida atual do player.
-    /// </summary>
     private int currentHealth;
 
-    /// <summary>
-    /// Propriedade somente leitura da vida atual.
-    /// (Permite outros scripts lerem, mas não alterarem diretamente.)
-    /// </summary>
-    public int CurrentHealth => currentHealth;
+    [Header("Combat Mode")]
+    [SerializeField] private float combatFadeTime = 5f; // Tempo sem atacar/levar dano para sair de combate.
 
     /// <summary>
-    /// Propriedade somente leitura da vida máxima.
+    /// Momento do Ãºltimo evento de combate (ataque ou dano recebido).
     /// </summary>
-    public int MaxHealth => maxHealth;
+    private float lastCombatTime = -999f;
 
     /// <summary>
-    /// Flag simples para indicar se o player já morreu.
+    /// Indica se o player estÃ¡ em modo de combate.
     /// </summary>
-    private bool isDead = false;
+    private bool isInCombat = false;
 
-    //======================================================================
-    //  MÉTODOS UNITY
-    //======================================================================
+    //==========================================================
+    //  CICLO DE VIDA
+    //==========================================================
 
-    /// <summary>
-    /// Chamado assim que o objeto é instanciado.
-    /// Aqui garantimos que as referências principais estejam configuradas.
-    /// </summary>
     private void Awake()
     {
-        // Se não foi arrastado pelo Inspector, tenta pegar automaticamente.
-        if (rb == null)
-            rb = GetComponent<Rigidbody2D>();
+        // Se nÃ£o foi setado no Inspector, tenta pegar automaticamente.
+        if (rb == null) rb = GetComponent<Rigidbody2D>();
+        if (playerAnim == null) playerAnim = GetComponentInChildren<PlayerAnim>();
 
-        // Se não foi arrastado pelo Inspector, tenta pegar em um filho.
-        if (playerAnim == null)
-            playerAnim = GetComponentInChildren<PlayerAnim>();
+        mainCam = Camera.main;
 
-        // Se a câmera não foi atribuída, usa a Camera.main.
-        if (mainCamera == null)
-            mainCamera = Camera.main;
-
-        // Inicia a vida atual no valor máximo.
+        // Inicializa vida.
         currentHealth = maxHealth;
     }
 
-    /// <summary>
-    /// Chamado a cada frame.
-    /// Ideal para ler input do jogador.
-    /// </summary>
     private void Update()
     {
-        if (isDead) return; // Se já morreu, não processa mais nada.
-
-        HandleMouseInput();   // Lida com clique para movimento/target.
-        HandleAutoAttack();   // Lida com auto-attack se tiver alvo.
-        HandleManualSkills(); // Exemplo de skills em teclas (F1, F2 etc).
-        UpdateAnimationState(); // Atualiza animações com base no estado atual.
+        HandleMouseInput();
+        HandleKeyboardInput();
+        UpdateCombatMode();
+        UpdateAnimation();
     }
 
-    /// <summary>
-    /// Chamado em intervalos fixos, ideal para código de física.
-    /// </summary>
     private void FixedUpdate()
     {
-        if (isDead) return;
-
-        HandleMovement(); // Aplica o movimento físico.
+        HandleMovement();
     }
 
-    //======================================================================
-    //  INPUT DO MOUSE (CLICK-TO-MOVE + TARGET)
-    //======================================================================
+    //==========================================================
+    //  INPUT DE MOUSE (CLICK-TO-MOVE + TARGET)
+    //==========================================================
 
     /// <summary>
-    /// Lê o input do mouse e decide se é para:
-    /// - Mover o player até um ponto do cenário.
-    /// - Ou selecionar um inimigo como target.
+    /// Trata cliques do mouse: chÃ£o, inimigos, etc.
     /// </summary>
     private void HandleMouseInput()
     {
-        // Botão esquerdo do mouse: selecionar alvo (ou ground para andar).
+        // BotÃ£o esquerdo do mouse.
         if (Input.GetMouseButtonDown(0))
         {
-            // Converte posição do clique na tela para mundo.
-            Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
-            Vector2 mouseWorld2D = new Vector2(mouseWorldPos.x, mouseWorldPos.y);
+            Vector3 mouseWorldPos = mainCam.ScreenToWorldPoint(Input.mousePosition);
+            mouseWorldPos.z = 0f;
 
-            // Tenta detectar um inimigo exatamente sob o clique.
-            Collider2D hit = Physics2D.OverlapPoint(mouseWorld2D, enemyLayer);
+            // Primeiro tenta acertar um inimigo.
+            RaycastHit2D hitEnemy = Physics2D.Raycast(mouseWorldPos, Vector2.zero, 0f, enemyMask);
 
-            if (hit != null)
+            if (hitEnemy.collider != null)
             {
-                // Achou inimigo: pega EnemyBase e seta como alvo.
-                EnemyBase enemy = hit.GetComponentInParent<EnemyBase>();
+                // Achou inimigo.
+                ITargetable target = hitEnemy.collider.GetComponent<ITargetable>();
 
-                if (enemy != null)
+                if (target != null)
                 {
-                    SetTarget(enemy);
-                    // Opcional: também mover em direção ao alvo.
-                    SetMoveTarget(enemy.transform.position);
+                    HandleClickOnEnemy(target);
+                    return;
                 }
             }
-            else
+
+            // Se nÃ£o foi inimigo, tenta chÃ£o (movimento).
+            RaycastHit2D hitGround = Physics2D.Raycast(mouseWorldPos, Vector2.zero, 0f, groundMask);
+
+            if (hitGround.collider != null)
             {
-                // Não clicou em inimigo: limpa target e move até o ponto clicado.
-                ClearTarget();
-                SetMoveTarget(mouseWorld2D);
+                // Define novo destino para andar.
+                moveDestination = hitGround.point;
+                isAutoMoving = true;
+
+                // Clique no chÃ£o NÃƒO limpa o target (igual Lineage2).
+                pendingSkill = null;
+                pendingSkillTarget = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// LÃ³gica ao clicar em um inimigo com o botÃ£o esquerdo.
+    /// 1 clique  â†’ seleciona (pega target)
+    /// 2 cliques â†’ seleciona e inicia ataque bÃ¡sico.
+    /// </summary>
+    private void HandleClickOnEnemy(ITargetable target)
+    {
+        float timeNow = Time.time;
+
+        // Se Ã© um novo alvo ou passou do tempo de double click,
+        // tratamos como 1Âº clique: apenas selecionar alvo.
+        bool isDoubleClick = (target == lastClickedTarget) &&
+                             (timeNow - lastClickTime <= doubleClickThreshold);
+
+        lastClickTime = timeNow;
+        lastClickedTarget = target;
+
+        // Sempre define o target ao clicar.
+        TargetManager.Instance.SetTarget(target);
+
+        // Se foi duplo clique â†’ inicia ataque bÃ¡sico automÃ¡tico.
+        if (isDoubleClick)
+        {
+            TryUseSkillOnTarget(basicAttack, target);
+        }
+    }
+
+    //==========================================================
+    //  INPUT DE TECLADO (SKILLS / TAB)
+    //==========================================================
+
+    /// <summary>
+    /// Tratamento do teclado: TAB, skills F1/F2/F3...
+    /// </summary>
+    private void HandleKeyboardInput()
+    {
+        // TAB para ciclar targets.
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            TargetManager.Instance.CycleTargetWithTab(transform.position, tabSearchRadius);
+        }
+
+        // Pressionar skills configuradas.
+        foreach (var slot in skills)
+        {
+            if (Input.GetKeyDown(slot.key))
+            {
+                // SÃ³ funciona se houver target.
+                ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
+                if (currentTarget != null && currentTarget.IsAlive)
+                {
+                    TryUseSkillOnTarget(slot, currentTarget);
+                }
+            }
+        }
+    }
+
+    //==========================================================
+    //  SKILLS / AUTO-APPROACH
+    //==========================================================
+
+    /// <summary>
+    /// Tenta usar uma skill em um alvo.
+    /// Se estiver fora do range, move-se automaticamente atÃ© entrar no alcance.
+    /// </summary>
+    private void TryUseSkillOnTarget(SkillSlot slot, ITargetable target)
+    {
+        if (slot == null || target == null) return;
+
+        // Verifica cooldown.
+        if (Time.time < slot.lastUseTime + slot.cooldown)
+        {
+            // Ainda em cooldown, poderia mostrar mensagem na UI.
+            return;
+        }
+
+        // JÃ¡ guarda como skill pendente â€“ se estiver fora do alcance, o movimento usarÃ¡ isso.
+        pendingSkill = slot;
+        pendingSkillTarget = target;
+
+        float dist = Vector3.Distance(transform.position, target.TargetTransform.position);
+
+        if (dist > slot.range)
+        {
+            // Fora do alcance â†’ andar atÃ© aproximar.
+            moveDestination = target.TargetTransform.position;
+            isAutoMoving = true;
+        }
+        else
+        {
+            // JÃ¡ estÃ¡ em alcance â†’ executa imediatamente.
+            StartCoroutine(CastAndExecuteSkill(slot, target));
+        }
+    }
+
+    /// <summary>
+    /// Coroutine que gerencia cast time, animaÃ§Ã£o e aplicaÃ§Ã£o de dano.
+    /// </summary>
+    private IEnumerator CastAndExecuteSkill(SkillSlot slot, ITargetable target)
+    {
+        if (isCasting) yield break; // Evita sobreposiÃ§Ã£o de casts.
+
+        isCasting = true;
+        slot.lastUseTime = Time.time;
+
+        // Entra em modo de combate.
+        RegisterCombatEvent();
+
+        // Para de se mover para conjurar.
+        isAutoMoving = false;
+        moveDestination = null;
+        rb.linearVelocity = Vector2.zero;
+
+        // Faz o player olhar para o alvo (flip no eixo X).
+        FaceTarget(target.TargetTransform.position);
+
+        // Liga flag de casting no Animator.
+        playerAnim.SetCasting(true);
+
+        // Se for ataque bÃ¡sico, dispara trigger de ataque.
+        if (slot == basicAttack)
+        {
+            playerAnim.PlayBasicAttack();
+        }
+
+        // Espera o tempo de cast.
+        yield return new WaitForSeconds(slot.castTime);
+
+        // Confere se o alvo ainda Ã© vÃ¡lido.
+        if (target != null && target.IsAlive)
+        {
+            // Aplica dano.
+            target.TakeDamage(slot.damage);
+
+            // Esferas da HUD ficam vermelhas quando atacamos de fato.
+            if (enemyHud != null && TargetManager.Instance.CurrentTarget == target)
+            {
+                enemyHud.SetOrbsInCombat(true);
             }
         }
 
-        // Botão direito do mouse: apenas movimento, sem mexer no target.
-        if (Input.GetMouseButtonDown(1))
-        {
-            Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
-            Vector2 mouseWorld2D = new Vector2(mouseWorldPos.x, mouseWorldPos.y);
+        // Desliga flag de casting.
+        playerAnim.SetCasting(false);
 
-            SetMoveTarget(mouseWorld2D);
+        isCasting = false;
+
+        // Limpa skill pendente (foi executada).
+        if (pendingSkill == slot)
+        {
+            pendingSkill = null;
+            pendingSkillTarget = null;
         }
     }
 
-    /// <summary>
-    /// Define um novo ponto alvo para o movimento.
-    /// </summary>
-    /// <param name="destination">Posição no mundo 2D para onde o player irá.</param>
-    private void SetMoveTarget(Vector2 destination)
-    {
-        moveTarget = destination;
-        hasMoveTarget = true;
-    }
-
-    /// <summary>
-    /// Remove o destino de movimento atual.
-    /// </summary>
-    private void ClearMoveTarget()
-    {
-        hasMoveTarget = false;
-        rb.linearVelocity = Vector2.zero;
-    }
-
-    //======================================================================
+    //==========================================================
     //  MOVIMENTO
-    //======================================================================
+    //==========================================================
 
     /// <summary>
-    /// Calcula e aplica o movimento em direção ao destino atual (se existir).
+    /// Movimenta o player em direÃ§Ã£o ao destino atual (se houver).
+    /// TambÃ©m cuida de aproximar atÃ© o alcance da skill pendente.
     /// </summary>
     private void HandleMovement()
     {
-        if (!hasMoveTarget)
+        if (!isAutoMoving || isCasting)
         {
-            // Sem destino: zera velocidade.
+            // Se nÃ£o estÃ¡ auto-movendo ou estÃ¡ conjurando, fica parado.
             rb.linearVelocity = Vector2.zero;
             return;
         }
 
-        // Direção (vetor) do player até o destino.
-        Vector2 direction = moveTarget - rb.position;
-
-        // Distância até o destino.
-        float distance = direction.magnitude;
-
-        // Se já está bem próximo, considera que chegou.
-        if (distance <= arriveThreshold)
+        if (moveDestination.HasValue)
         {
-            ClearMoveTarget();
-            return;
-        }
+            Vector2 currentPos = rb.position;
+            Vector2 dest = moveDestination.Value;
 
-        // Normaliza a direção (transforma em vetor unitário).
-        direction.Normalize();
+            Vector2 dir = (dest - currentPos);
+            float distance = dir.magnitude;
 
-        // Aplica velocidade constante na direção do destino.
-        rb.linearVelocity = direction * moveSpeed;
+            if (distance <= stoppingDistance)
+            {
+                // Chegou ao destino principal.
+                rb.linearVelocity = Vector2.zero;
+                isAutoMoving = false;
+                moveDestination = null;
 
-        // Atualiza a direção visual do player (flip do sprite).
-        playerAnim.SetLookDirection(direction);
-    }
+                // Se estÃ¡ indo atacar uma skill pendente, checa range.
+                if (pendingSkill != null && pendingSkillTarget != null && pendingSkillTarget.IsAlive)
+                {
+                    float distToTarget = Vector3.Distance(transform.position, pendingSkillTarget.TargetTransform.position);
 
-    //======================================================================
-    //  SISTEMA DE TARGET
-    //======================================================================
+                    if (distToTarget <= pendingSkill.range)
+                    {
+                        // JÃ¡ estÃ¡ em alcance â†’ executa a skill.
+                        StartCoroutine(CastAndExecuteSkill(pendingSkill, pendingSkillTarget));
+                    }
+                }
 
-    /// <summary>
-    /// Define um novo inimigo como alvo atual.
-    /// </summary>
-    /// <param name="enemy">Instância do inimigo (EnemyBase).</param>
-    private void SetTarget(EnemyBase enemy)
-    {
-        currentTarget = enemy;
-        // Aqui daria para acionar um highlight no inimigo, se quiser.
-    }
+                return;
+            }
 
-    /// <summary>
-    /// Remove completamente o alvo atual.
-    /// </summary>
-    private void ClearTarget()
-    {
-        currentTarget = null;
-    }
+            // Move na direÃ§Ã£o do destino.
+            Vector2 dirNormalized = dir.normalized;
+            rb.linearVelocity = dirNormalized * moveSpeed;
 
-    /// <summary>
-    /// Retorna a distância atual até o alvo, ou um valor grande
-    /// se não existir alvo (para simplificar checks).
-    /// </summary>
-    private float DistanceToTarget()
-    {
-        if (currentTarget == null)
-            return Mathf.Infinity;
-
-        return Vector2.Distance(transform.position, currentTarget.transform.position);
-    }
-
-    //======================================================================
-    //  AUTO-ATTACK + COOLDOWN + SKILLS
-    //======================================================================
-
-    /// <summary>
-    /// Lógica de auto-attack:
-    /// - Se há alvo.
-    /// - Se está no alcance.
-    /// - Se o cooldown já passou.
-    /// - Então executa o ataque básico automaticamente.
-    /// </summary>
-    private void HandleAutoAttack()
-    {
-        if (!autoAttackEnabled) return;
-        if (currentTarget == null) return;
-
-        // Distância até o alvo.
-        float distance = DistanceToTarget();
-
-        // Se está longe demais, apenas anda em direção ao alvo.
-        if (distance > attackRange)
-        {
-            SetMoveTarget(currentTarget.transform.position);
-            return;
-        }
-
-        // Está perto o bastante: para o movimento.
-        ClearMoveTarget();
-
-        // Vira para o alvo.
-        Vector2 dir = (currentTarget.transform.position - transform.position).normalized;
-        playerAnim.SetLookDirection(dir);
-
-        // Verifica cooldown.
-        if (Time.time >= lastAttackTime + attackCooldown)
-        {
-            PerformBasicAttack();
-        }
-    }
-
-    /// <summary>
-    /// Exemplo de sistema de skills manuais com cooldown:
-    /// aqui usamos teclas F1/F2 só para ilustrar o conceito.
-    /// </summary>
-    private void HandleManualSkills()
-    {
-        // F1: liga/desliga o auto-attack.
-        if (Input.GetKeyDown(KeyCode.F1))
-        {
-            autoAttackEnabled = !autoAttackEnabled;
-            // Aqui você poderia exibir um ícone/feedback visual.
-        }
-
-        // F2: exemplo de "skill especial" manual (a implementar depois).
-        // if (Input.GetKeyDown(KeyCode.F2)) { ... }
-    }
-
-    /// <summary>
-    /// Executa o ataque básico:
-    /// - Dispara a animação de ataque.
-    /// - Aplica dano no alvo atual.
-    /// - Atualiza o tempo do último ataque (para o cooldown).
-    /// </summary>
-    private void PerformBasicAttack()
-    {
-        if (currentTarget == null) return;
-
-        // Dispara a animação de ataque.
-        playerAnim.PlayBasicAttack();
-
-        // Aplica dano no inimigo, se ainda existir.
-        currentTarget.TakeDamage(attackDamage);
-
-        // Atualiza o tempo do último ataque.
-        lastAttackTime = Time.time;
-    }
-
-    //======================================================================
-    //  VIDA / DANO / MORTE
-    //======================================================================
-
-    /// <summary>
-    /// Aplica dano ao player.
-    /// Esse método deve ser chamado pelos inimigos quando acertarem o player.
-    /// </summary>
-    /// <param name="amount">Quantidade de dano bruto.</param>
-    public void TakeDamage(int amount)
-    {
-        if (isDead) return;
-
-        // Garante que o dano não seja negativo.
-        amount = Mathf.Max(0, amount);
-
-        currentHealth -= amount;
-
-        // Se chegou em zero ou menos, morre.
-        if (currentHealth <= 0)
-        {
-            currentHealth = 0;
-            Die();
+            // Atualiza orientaÃ§Ã£o visual do player.
+            FaceTarget(dest);
         }
         else
         {
-            // Aqui você poderia tocar uma animação de "hit",
-            // som, screen shake etc.
+            rb.linearVelocity = Vector2.zero;
         }
     }
 
     /// <summary>
-    /// Lógica de morte do player.
+    /// Faz o player "olhar" para uma posiÃ§Ã£o (flip no eixo X).
+    /// </summary>
+    /// <param name="worldPosition">PosiÃ§Ã£o de interesse (alvo).</param>
+    private void FaceTarget(Vector3 worldPosition)
+    {
+        // Se o alvo estiver Ã  direita, X positivo; se Ã  esquerda, X negativo.
+        if (worldPosition.x > transform.position.x)
+        {
+            transform.localScale = new Vector3(1f, 1f, 1f);
+        }
+        else
+        {
+            transform.localScale = new Vector3(-1f, 1f, 1f);
+        }
+    }
+
+    /// <summary>
+    /// Atualiza animaÃ§Ã£o de movimento (Idle/Walk).
+    /// </summary>
+    private void UpdateAnimation()
+    {
+        // Usa a velocidade atual do Rigidbody2D como base.
+        float speed = rb.linearVelocity.magnitude;
+        playerAnim.UpdateMovement(speed);
+    }
+
+    //==========================================================
+    //  COMBAT MODE & DANO RECEBIDO
+    //==========================================================
+
+    /// <summary>
+    /// Registra um evento de combate (ataque ou dano recebido).
+    /// Faz o player entrar em modo de combate.
+    /// </summary>
+    private void RegisterCombatEvent()
+    {
+        lastCombatTime = Time.time;
+        if (!isInCombat)
+        {
+            isInCombat = true;
+            playerAnim.SetInCombat(true);
+            // Aqui vocÃª pode ligar Ã­cone de espadas cruzadas na HUD do player.
+        }
+    }
+
+    /// <summary>
+    /// Atualiza o modo de combate, saindo depois de X segundos
+    /// sem atacar ou levar dano.
+    /// </summary>
+    private void UpdateCombatMode()
+    {
+        if (isInCombat && Time.time > lastCombatTime + combatFadeTime)
+        {
+            isInCombat = false;
+            playerAnim.SetInCombat(false);
+
+            // TambÃ©m pode apagar o Ã­cone de espadas cruzadas na HUD aqui.
+        }
+
+        // Extra: se o alvo se afastar demais, remove target.
+        ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
+        if (currentTarget != null)
+        {
+            float dist = Vector3.Distance(transform.position, currentTarget.TargetTransform.position);
+            if (dist > maxTargetDistanceToKeep)
+            {
+                TargetManager.Instance.ClearTarget();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Receber dano do inimigo.
+    /// </summary>
+    /// <param name="amount">Quantidade de dano recebido.</param>
+    public void TakeDamage(int amount)
+    {
+        amount = Mathf.Max(0, amount);
+
+        currentHealth -= amount;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        // Entrar em combate ao receber dano.
+        RegisterCombatEvent();
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    /// <summary>
+    /// LÃ³gica de morte do player.
+    /// (VocÃª pode conectar com animaÃ§Ã£o de morte e voltar ao menu, etc.)
     /// </summary>
     private void Die()
     {
-        if (isDead) return;
+        // Por enquanto, sÃ³ desabilita o movimento.
+        isAutoMoving = false;
+        pendingSkill = null;
+        pendingSkillTarget = null;
+        rb.linearVelocity = Vector2.zero;
 
-        isDead = true;
-
-        // Para qualquer movimento.
-        ClearMoveTarget();
-
-        // Dispara animação de morte.
-        playerAnim.PlayDeath();
-
-        // Aqui você pode desabilitar inputs, abrir tela de gameover etc.
-    }
-
-    //======================================================================
-    //  ATUALIZAÇÃO DE ANIMAÇÃO GENÉRICA
-    //======================================================================
-
-    /// <summary>
-    /// Atualiza o "estado base" da animação (Idle / Walk)
-    /// de acordo com a velocidade atual do player.
-    /// </summary>
-    private void UpdateAnimationState()
-    {
-        if (isDead)
-        {
-            // Se quiser impedir que volte para Idle/Walk depois de morrer,
-            // basta retornar aqui.
-            return;
-        }
-
-        // Velocidade atual em módulo (sem direção).
-        float speed = rb.linearVelocity.magnitude;
-
-        // Informa ao PlayerAnim o valor atual de velocidade,
-        // para que ele decida entre Idle e Walk.
-        playerAnim.SetMoveSpeed(speed);
+        // Aqui vocÃª pode disparar animaÃ§Ã£o de morte e bloquear input.
+        Debug.Log("PLAYER MORREU");
     }
 }
