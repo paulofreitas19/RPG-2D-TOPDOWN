@@ -1,14 +1,16 @@
 ﻿using UnityEngine;
 using System.Collections;
+using UnityEngine.EventSystems;
 
 /// <summary>
-/// Controla o player no estilo Lineage2 / Perfect World:
-/// - Movimento por clique (click-to-move)
+/// Controla o player no estilo Lineage / Perfect World:
+/// - Click-to-move
 /// - Sistema de target (clique / TAB)
-/// - Ataque básico e skills em F1/F2 com cooldown e cast
-/// - Auto-approach até alcance da skill
-/// - Combat Mode
+/// - Ataque básico e skills (F1, F2...)
+/// - Auto-approach até o alcance da skill
+/// - Modo de combate + integração com HUD de inimigo
 /// </summary>
+[RequireComponent(typeof(Rigidbody2D))]
 public class Player : MonoBehaviour
 {
     //==========================================================
@@ -16,109 +18,82 @@ public class Player : MonoBehaviour
     //==========================================================
 
     [Header("Componentes")]
-    [SerializeField] private Rigidbody2D rb;          // Movimentação física 2D.
-    [SerializeField] private PlayerAnim playerAnim;   // Controlador de animação.
-    [SerializeField] private EnemyHUDController enemyHud; // Para acender as esferas.
+    [SerializeField] private Rigidbody2D rb;              // Movimento físico 2D.
+    [SerializeField] private PlayerAnim playerAnim;       // Controlador de animações.
+    [SerializeField] private EnemyHUDController enemyHud; // HUD de inimigo (no Canvas).
 
-    private Camera mainCam;
+    private Camera mainCam;                               // Referência à Camera.main.
 
     //==========================================================
     //  MOVIMENTO (CLICK-TO-MOVE)
     //==========================================================
 
     [Header("Movimento")]
-    [SerializeField] private float moveSpeed = 3f;        // Velocidade de caminhada.
-    [SerializeField] private float stoppingDistance = 0.1f; // Distância mínima para considerar que chegou no ponto.
+    [SerializeField] private float moveSpeed = 3f;          // Velocidade de caminhada.
+    [SerializeField] private float stoppingDistance = 0.1f; // Distância mínima para "cheguei".
 
-    /// <summary>
-    /// Ponto alvo de movimento atual (no chão).
-    /// </summary>
-    private Vector3? moveDestination = null;
-
-    /// <summary>
-    /// Se está em movimento automático (indo a um destino ou aproximando-se do alvo).
-    /// </summary>
-    private bool isAutoMoving = false;
+    private Vector3? moveDestination = null;                // Ponto para onde estamos indo.
+    private bool isAutoMoving = false;                      // Se o player está em movimento automático.
 
     //==========================================================
     //  TARGET & INPUT DE MOUSE
     //==========================================================
 
     [Header("Target / Input")]
-    [SerializeField] private LayerMask groundMask;   // Layer do chão (para Raycast).
-    [SerializeField] private LayerMask enemyMask;    // Layer de inimigos (para Raycast).
-    [SerializeField] private float tabSearchRadius = 20f;  // Raio para achar inimigo mais próximo no TAB.
-    [SerializeField] private float maxTargetDistanceToKeep = 25f; // Distância máxima para manter o target (extra segurança).
+    [SerializeField] private LayerMask groundMask;          // Layer do chão.
+    [SerializeField] private LayerMask enemyMask;           // Layer de inimigos (para clique).
+    [SerializeField] private float tabSearchRadius = 20f;   // Raio para TAB.
+    [SerializeField] private float maxTargetDistanceToKeep = 25f; // Distância máxima para manter target.
 
-    /// <summary>
-    /// Tempo máximo entre cliques para considerar duplo clique.
-    /// </summary>
-    [SerializeField] private float doubleClickThreshold = 0.25f;
+    [SerializeField] private float doubleClickThreshold = 0.25f;  // Delay para detectar duplo clique.
 
-    private float lastClickTime = -999f;
-    private ITargetable lastClickedTarget = null;
+    private float lastClickTime = -999f;                   // Momento do último clique no inimigo.
+    private ITargetable lastClickedTarget = null;          // Último alvo clicado.
 
     //==========================================================
-    //  SKILLS E ATAQUE
+    //  SKILLS E ATAQUES
     //==========================================================
 
     [System.Serializable]
     public class SkillSlot
     {
         [Header("Identificação")]
-        public string skillName = "Skill";
+        public string skillName = "Skill";   // Nome para debug.
 
         [Header("Tecla")]
-        public KeyCode key = KeyCode.F1;
+        public KeyCode key = KeyCode.F1;     // Tecla para disparar a skill.
 
         [Header("Combate")]
-        public float range = 1.7f;     // Alcance da skill.
-        public float cooldown = 2f;    // Tempo entre usos.
-        public float castTime = 0.3f;  // Tempo de conjuração.
-        public int damage = 10;        // Dano da skill.
+        public float range = 1.7f;           // Alcance da skill.
+        public float cooldown = 2f;          // Cooldown.
+        public float castTime = 0.3f;        // Tempo de conjuração.
+        public int damage = 10;              // Dano causado.
 
-        [HideInInspector] public float lastUseTime = -999f;
+        [HideInInspector] public float lastUseTime = -999f; // Última vez que foi usada.
     }
 
     [Header("Skills")]
-    [SerializeField] private SkillSlot basicAttack; // Usada no duplo clique.
-    [SerializeField] private SkillSlot[] skills;    // Skills de F1, F2, F3...
+    [SerializeField] private SkillSlot basicAttack;     // Skill usada no duplo clique.
+    [SerializeField] private SkillSlot[] skills;        // Skills extras (F1, F2...).
 
-    /// <summary>
-    /// Se está conjurando alguma skill no momento.
-    /// </summary>
-    private bool isCasting = false;
-
-    /// <summary>
-    /// Skill pendente de ser executada assim que chegar no alcance.
-    /// </summary>
-    private SkillSlot pendingSkill = null;
-
-    /// <summary>
-    /// Alvo no momento em que a skill foi iniciada.
-    /// </summary>
-    private ITargetable pendingSkillTarget = null;
+    private bool isCasting = false;                    // Está conjurando alguma coisa?
+    private SkillSlot pendingSkill = null;             // Skill que está esperando entrar em alcance.
+    private ITargetable pendingSkillTarget = null;     // Alvo da skill pendente.
 
     //==========================================================
     //  VIDA / COMBATE
     //==========================================================
 
     [Header("Vida & Dano")]
-    [SerializeField] private int maxHealth = 100;
-    private int currentHealth;
+    [SerializeField] private int maxHealth = 100;       // Vida máxima do player.
+    private int currentHealth;                          // Vida atual.
 
     [Header("Combat Mode")]
-    [SerializeField] private float combatFadeTime = 5f; // Tempo sem atacar/levar dano para sair de combate.
+    [SerializeField] private float combatFadeTime = 5f; // Tempo sem combate para sair do modo.
 
-    /// <summary>
-    /// Momento do último evento de combate (ataque ou dano recebido).
-    /// </summary>
-    private float lastCombatTime = -999f;
-
-    /// <summary>
-    /// Indica se o player está em modo de combate.
-    /// </summary>
-    private bool isInCombat = false;
+    private float lastCombatTime = -999f;               // Último evento de combate.
+    private bool isInCombat = false;                    // Está em modo de combate?
+    private bool isDead = false;                        // Player morreu?
 
     //==========================================================
     //  CICLO DE VIDA
@@ -126,9 +101,10 @@ public class Player : MonoBehaviour
 
     private void Awake()
     {
-        // Se não foi setado no Inspector, tenta pegar automaticamente.
+        // Garante referências.
         if (rb == null) rb = GetComponent<Rigidbody2D>();
         if (playerAnim == null) playerAnim = GetComponentInChildren<PlayerAnim>();
+        if (enemyHud == null) enemyHud = EnemyHUDController.Instance;
 
         mainCam = Camera.main;
 
@@ -138,57 +114,63 @@ public class Player : MonoBehaviour
 
     private void Update()
     {
-        HandleMouseInput();
-        HandleKeyboardInput();
-        UpdateCombatMode();
-        UpdateAnimation();
+        if (isDead) return;                    // Morto não faz nada.
+
+        HandleMouseInput();                    // Clique para andar / selecionar alvo.
+        HandleKeyboardInput();                 // TAB + skills.
+        UpdateCombatMode();                    // Entrar/sair de combate.
+        UpdateAnimation();                     // Atualizar Animator.
     }
 
     private void FixedUpdate()
     {
-        HandleMovement();
+        if (isDead) return;                    // Morto não anda.
+
+        HandleMovement();                      // Andar até o destino.
     }
 
     //==========================================================
-    //  INPUT DE MOUSE (CLICK-TO-MOVE + TARGET)
+    //  INPUT DE MOUSE
     //==========================================================
 
-    /// <summary>
-    /// Trata cliques do mouse: chão, inimigos, etc.
-    /// </summary>
     private void HandleMouseInput()
     {
-        // Botão esquerdo do mouse.
+        // Evita que cliques em UI sejam processados como movimento
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         if (Input.GetMouseButtonDown(0))
         {
+            // Converte posição de tela para mundo.
             Vector3 mouseWorldPos = mainCam.ScreenToWorldPoint(Input.mousePosition);
             mouseWorldPos.z = 0f;
 
-            // Primeiro tenta acertar um inimigo.
-            RaycastHit2D hitEnemy = Physics2D.Raycast(mouseWorldPos, Vector2.zero, 0f, enemyMask);
+            //--------------------------------------------------
+            // 1) Tentamos clicar em um inimigo.
+            //--------------------------------------------------
+            Collider2D enemyCol = Physics2D.OverlapPoint(mouseWorldPos, enemyMask);
 
-            if (hitEnemy.collider != null)
+            if (enemyCol != null)
             {
-                // Achou inimigo.
-                ITargetable target = hitEnemy.collider.GetComponent<ITargetable>();
-
+                ITargetable target = enemyCol.GetComponent<ITargetable>();
                 if (target != null)
                 {
                     HandleClickOnEnemy(target);
-                    return;
+                    return; // Não processa clique no chão.
                 }
             }
 
-            // Se não foi inimigo, tenta chão (movimento).
-            RaycastHit2D hitGround = Physics2D.Raycast(mouseWorldPos, Vector2.zero, 0f, groundMask);
+            //--------------------------------------------------
+            // 2) Se não clicou em inimigo, tratamos como chão.
+            //--------------------------------------------------
+            Collider2D groundCol = Physics2D.OverlapPoint(mouseWorldPos, groundMask);
 
-            if (hitGround.collider != null)
+            if (groundCol != null)
             {
-                // Define novo destino para andar.
-                moveDestination = hitGround.point;
+                moveDestination = mouseWorldPos; // Andar até o ponto clicado.
                 isAutoMoving = true;
 
-                // Clique no chão NÃO limpa o target (igual Lineage2).
+                // Não limpamos o target (comportamento Lineage-like).
                 pendingSkill = null;
                 pendingSkillTarget = null;
             }
@@ -196,26 +178,24 @@ public class Player : MonoBehaviour
     }
 
     /// <summary>
-    /// Lógica ao clicar em um inimigo com o botão esquerdo.
-    /// 1 clique  → seleciona (pega target)
-    /// 2 cliques → seleciona e inicia ataque básico.
+    /// Lógica de clique em inimigo (1x seleciona, 2x ataca).
     /// </summary>
     private void HandleClickOnEnemy(ITargetable target)
     {
-        float timeNow = Time.time;
+        float now = Time.time;
 
-        // Se é um novo alvo ou passou do tempo de double click,
-        // tratamos como 1º clique: apenas selecionar alvo.
-        bool isDoubleClick = (target == lastClickedTarget) &&
-                             (timeNow - lastClickTime <= doubleClickThreshold);
+        bool isDoubleClick =
+            (target == lastClickedTarget) &&
+            (now - lastClickTime <= doubleClickThreshold);
 
-        lastClickTime = timeNow;
+        lastClickTime = now;
         lastClickedTarget = target;
 
-        // Sempre define o target ao clicar.
-        TargetManager.Instance.SetTarget(target);
+        // Define alvo no TargetManager.
+        if (TargetManager.Instance != null)
+            TargetManager.Instance.SetTarget(target);
 
-        // Se foi duplo clique → inicia ataque básico automático.
+        // Se foi duplo clique → ataca.
         if (isDoubleClick)
         {
             TryUseSkillOnTarget(basicAttack, target);
@@ -223,30 +203,32 @@ public class Player : MonoBehaviour
     }
 
     //==========================================================
-    //  INPUT DE TECLADO (SKILLS / TAB)
+    //  INPUT DE TECLADO
     //==========================================================
 
-    /// <summary>
-    /// Tratamento do teclado: TAB, skills F1/F2/F3...
-    /// </summary>
     private void HandleKeyboardInput()
     {
-        // TAB para ciclar targets.
-        if (Input.GetKeyDown(KeyCode.Tab))
+        // TAB: ciclo entre alvos.
+        if (Input.GetKeyDown(KeyCode.Tab) && TargetManager.Instance != null)
         {
             TargetManager.Instance.CycleTargetWithTab(transform.position, tabSearchRadius);
         }
 
-        // Pressionar skills configuradas.
-        foreach (var slot in skills)
+        // Skills adicionais (F1/F2/F3...).
+        if (skills != null)
         {
-            if (Input.GetKeyDown(slot.key))
+            foreach (var slot in skills)
             {
-                // Só funciona se houver target.
-                ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
-                if (currentTarget != null && currentTarget.IsAlive)
+                if (Input.GetKeyDown(slot.key))
                 {
-                    TryUseSkillOnTarget(slot, currentTarget);
+                    ITargetable currentTarget = TargetManager.Instance != null
+                        ? TargetManager.Instance.CurrentTarget
+                        : null;
+
+                    if (currentTarget != null && currentTarget.IsAlive)
+                    {
+                        TryUseSkillOnTarget(slot, currentTarget);
+                    }
                 }
             }
         }
@@ -256,22 +238,15 @@ public class Player : MonoBehaviour
     //  SKILLS / AUTO-APPROACH
     //==========================================================
 
-    /// <summary>
-    /// Tenta usar uma skill em um alvo.
-    /// Se estiver fora do range, move-se automaticamente até entrar no alcance.
-    /// </summary>
     private void TryUseSkillOnTarget(SkillSlot slot, ITargetable target)
     {
         if (slot == null || target == null) return;
 
-        // Verifica cooldown.
+        // Cooldown.
         if (Time.time < slot.lastUseTime + slot.cooldown)
-        {
-            // Ainda em cooldown, poderia mostrar mensagem na UI.
             return;
-        }
 
-        // Já guarda como skill pendente – se estiver fora do alcance, o movimento usará isso.
+        // Define como skill pendente.
         pendingSkill = slot;
         pendingSkillTarget = target;
 
@@ -285,63 +260,56 @@ public class Player : MonoBehaviour
         }
         else
         {
-            // Já está em alcance → executa imediatamente.
+            // Já está em alcance → executa agora.
             StartCoroutine(CastAndExecuteSkill(slot, target));
         }
     }
 
-    /// <summary>
-    /// Coroutine que gerencia cast time, animação e aplicação de dano.
-    /// </summary>
     private IEnumerator CastAndExecuteSkill(SkillSlot slot, ITargetable target)
     {
-        if (isCasting) yield break; // Evita sobreposição de casts.
+        if (isCasting) yield break;          // Evita sobrepor casts.
 
         isCasting = true;
         slot.lastUseTime = Time.time;
 
-        // Entra em modo de combate.
-        RegisterCombatEvent();
+        RegisterCombatEvent();               // Entra em modo de combate.
 
-        // Para de se mover para conjurar.
-        isAutoMoving = false;
+        isAutoMoving = false;               // Para de andar.
         moveDestination = null;
         rb.linearVelocity = Vector2.zero;
 
-        // Faz o player olhar para o alvo (flip no eixo X).
+        // Olha para o alvo.
         FaceTarget(target.TargetTransform.position);
 
-        // Liga flag de casting no Animator.
+        // Liga flag de cast no Animator.
         playerAnim.SetCasting(true);
 
-        // Se for ataque básico, dispara trigger de ataque.
+        // Se for ataque básico → dispara trigger.
         if (slot == basicAttack)
-        {
             playerAnim.PlayBasicAttack();
-        }
 
         // Espera o tempo de cast.
         yield return new WaitForSeconds(slot.castTime);
 
-        // Confere se o alvo ainda é válido.
+        // Aplica dano se o alvo ainda está vivo.
         if (target != null && target.IsAlive)
         {
-            // Aplica dano.
             target.TakeDamage(slot.damage);
 
-            // Esferas da HUD ficam vermelhas quando atacamos de fato.
-            if (enemyHud != null && TargetManager.Instance.CurrentTarget == target)
+            // Marca orbs da HUD como "em combate".
+            if (enemyHud != null &&
+                TargetManager.Instance != null &&
+                TargetManager.Instance.CurrentTarget == target)
             {
                 enemyHud.SetOrbsInCombat(true);
             }
         }
 
-        // Desliga flag de casting.
+        // Termina cast.
         playerAnim.SetCasting(false);
-
         isCasting = false;
 
-        // Limpa skill pendente (foi executada).
+        // Se essa skill era a pendente, limpa.
         if (pendingSkill == slot)
         {
             pendingSkill = null;
@@ -353,85 +321,72 @@ public class Player : MonoBehaviour
     //  MOVIMENTO
     //==========================================================
 
-    /// <summary>
-    /// Movimenta o player em direção ao destino atual (se houver).
-    /// Também cuida de aproximar até o alcance da skill pendente.
-    /// </summary>
     private void HandleMovement()
     {
+        // Se não está andando automaticamente ou está conjurando → parado.
         if (!isAutoMoving || isCasting)
         {
-            // Se não está auto-movendo ou está conjurando, fica parado.
             rb.linearVelocity = Vector2.zero;
             return;
         }
 
-        if (moveDestination.HasValue)
-        {
-            Vector2 currentPos = rb.position;
-            Vector2 dest = moveDestination.Value;
-
-            Vector2 dir = (dest - currentPos);
-            float distance = dir.magnitude;
-
-            if (distance <= stoppingDistance)
-            {
-                // Chegou ao destino principal.
-                rb.linearVelocity = Vector2.zero;
-                isAutoMoving = false;
-                moveDestination = null;
-
-                // Se está indo atacar uma skill pendente, checa range.
-                if (pendingSkill != null && pendingSkillTarget != null && pendingSkillTarget.IsAlive)
-                {
-                    float distToTarget = Vector3.Distance(transform.position, pendingSkillTarget.TargetTransform.position);
-
-                    if (distToTarget <= pendingSkill.range)
-                    {
-                        // Já está em alcance → executa a skill.
-                        StartCoroutine(CastAndExecuteSkill(pendingSkill, pendingSkillTarget));
-                    }
-                }
-
-                return;
-            }
-
-            // Move na direção do destino.
-            Vector2 dirNormalized = dir.normalized;
-            rb.linearVelocity = dirNormalized * moveSpeed;
-
-            // Atualiza orientação visual do player.
-            FaceTarget(dest);
-        }
-        else
+        if (!moveDestination.HasValue)
         {
             rb.linearVelocity = Vector2.zero;
+            isAutoMoving = false;
+            return;
         }
+
+        Vector2 currentPos = rb.position;
+        Vector2 dest = moveDestination.Value;
+
+        // Direção até o destino.
+        Vector2 dir = dest - currentPos;
+        float distance = dir.magnitude;
+
+        if (distance <= stoppingDistance)
+        {
+            // Chegou.
+            rb.linearVelocity = Vector2.zero;
+            isAutoMoving = false;
+            moveDestination = null;
+
+            // Se estava se aproximando para skill pendente, checa alcance.
+            if (pendingSkill != null && pendingSkillTarget != null && pendingSkillTarget.IsAlive)
+            {
+                float distToTarget = Vector3.Distance(
+                    transform.position,
+                    pendingSkillTarget.TargetTransform.position);
+
+                if (distToTarget <= pendingSkill.range)
+                {
+                    StartCoroutine(CastAndExecuteSkill(pendingSkill, pendingSkillTarget));
+                }
+            }
+
+            return;
+        }
+
+        // Ainda longe → move na direção normalizada.
+        Vector2 dirNorm = dir.normalized;
+        rb.linearVelocity = dirNorm * moveSpeed;
+
+        // Flipa o sprite para "olhar" na direção.
+        FaceTarget(dest);
     }
 
-    /// <summary>
-    /// Faz o player "olhar" para uma posição (flip no eixo X).
-    /// </summary>
-    /// <param name="worldPosition">Posição de interesse (alvo).</param>
-    private void FaceTarget(Vector3 worldPosition)
+    /// <summary>Faz o player olhar para uma posição no mundo (flip X).</summary>
+    private void FaceTarget(Vector3 worldPos)
     {
-        // Se o alvo estiver à direita, X positivo; se à esquerda, X negativo.
-        if (worldPosition.x > transform.position.x)
-        {
-            transform.localScale = new Vector3(1f, 1f, 1f);
-        }
-        else
-        {
+        if (worldPos.x > transform.position.x)
             transform.localScale = new Vector3(-1f, 1f, 1f);
-        }
+        else
+            transform.localScale = new Vector3(1f, 1f, 1f);
     }
 
-    /// <summary>
-    /// Atualiza animação de movimento (Idle/Walk).
-    /// </summary>
+    /// <summary>Atualiza Animator com base na velocidade atual.</summary>
     private void UpdateAnimation()
     {
-        // Usa a velocidade atual do Rigidbody2D como base.
         float speed = rb.linearVelocity.magnitude;
         playerAnim.UpdateMovement(speed);
     }
@@ -440,13 +395,10 @@ public class Player : MonoBehaviour
     //  COMBAT MODE & DANO RECEBIDO
     //==========================================================
 
-    /// <summary>
-    /// Registra um evento de combate (ataque ou dano recebido).
-    /// Faz o player entrar em modo de combate.
-    /// </summary>
     private void RegisterCombatEvent()
     {
         lastCombatTime = Time.time;
+
         if (!isInCombat)
         {
             isInCombat = true;
@@ -455,65 +407,61 @@ public class Player : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Atualiza o modo de combate, saindo depois de X segundos
-    /// sem atacar ou levar dano.
-    /// </summary>
     private void UpdateCombatMode()
     {
+        // Sai do modo de combate após X segundos sem eventos.
         if (isInCombat && Time.time > lastCombatTime + combatFadeTime)
         {
             isInCombat = false;
             playerAnim.SetInCombat(false);
 
-            // Também pode apagar o ícone de espadas cruzadas na HUD aqui.
+            // HUD do inimigo pode voltar orbs para estado neutro.
+            if (enemyHud != null)
+                enemyHud.SetOrbsInCombat(false);
         }
 
-        // Extra: se o alvo se afastar demais, remove target.
-        ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
-        if (currentTarget != null)
+        // Se o alvo se afastar demais, limpa target.
+        if (TargetManager.Instance != null)
         {
-            float dist = Vector3.Distance(transform.position, currentTarget.TargetTransform.position);
-            if (dist > maxTargetDistanceToKeep)
+            ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
+            if (currentTarget != null)
             {
-                TargetManager.Instance.ClearTarget();
+                float dist = Vector3.Distance(
+                    transform.position,
+                    currentTarget.TargetTransform.position);
+
+                if (dist > maxTargetDistanceToKeep)
+                    TargetManager.Instance.ClearTarget();
             }
         }
     }
 
-    /// <summary>
-    /// Receber dano do inimigo.
-    /// </summary>
-    /// <param name="amount">Quantidade de dano recebido.</param>
+    /// <summary>Receber dano.</summary>
     public void TakeDamage(int amount)
     {
         amount = Mathf.Max(0, amount);
-
         currentHealth -= amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
-        // Entrar em combate ao receber dano.
         RegisterCombatEvent();
 
         if (currentHealth <= 0)
-        {
             Die();
-        }
     }
 
-    /// <summary>
-    /// Lógica de morte do player.
-    /// (Você pode conectar com animação de morte e voltar ao menu, etc.)
-    /// </summary>
+    /// <summary>Morte do player.</summary>
     private void Die()
     {
-        // Por enquanto, só desabilita o movimento.
         isAutoMoving = false;
         pendingSkill = null;
         pendingSkillTarget = null;
         rb.linearVelocity = Vector2.zero;
 
-        // Aqui você pode disparar animação de morte e bloquear input.
+        isDead = true;
+
+        // Animação de morte, se quiser.
+        playerAnim.PlayDeath();
+
         Debug.Log("PLAYER MORREU");
     }
 }

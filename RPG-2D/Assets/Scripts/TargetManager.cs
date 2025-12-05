@@ -1,25 +1,23 @@
 using UnityEngine;
 using System;
-using System.Collections.Generic;
 
 /// <summary>
-/// Gerencia o alvo atual do player, troca de target
-/// (clique ou TAB) e avisa HUD / outros sistemas.
+/// Gerencia o alvo atual do player (como em Lineage / MMOs).
 /// </summary>
 public class TargetManager : MonoBehaviour
 {
-    //==========================================================
-    //  SINGLETON BÁSICO
-    //==========================================================
-
-    /// <summary>
-    /// Instância única global (estilo serviço).
-    /// </summary>
+    // Singleton.
     public static TargetManager Instance { get; private set; }
+
+    /// <summary>Alvo atual.</summary>
+    public ITargetable CurrentTarget { get; private set; }
+
+    /// <summary>Evento disparado ao trocar de alvo.</summary>
+    public event Action<ITargetable> OnTargetChanged;
 
     private void Awake()
     {
-        // Garante singleton simples.
+        // Implementação simples de singleton.
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -27,146 +25,70 @@ public class TargetManager : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+        DontDestroyOnLoad(gameObject); // Opcional.
     }
 
-    //==========================================================
-    //  ALVO ATUAL
-    //==========================================================
-
-    /// <summary>
-    /// Alvo atual (inimigo ou NPC).
-    /// </summary>
-    public ITargetable CurrentTarget { get; private set; }
-
-    /// <summary>
-    /// Evento disparado quando o alvo é alterado.
-    /// </summary>
-    public event Action<ITargetable> OnTargetChanged;
-
-    //==========================================================
-    //  API PÚBLICA
-    //==========================================================
-
-    /// <summary>
-    /// Seleciona um novo alvo.
-    /// </summary>
-    public void SetTarget(ITargetable newTarget)
+    /// <summary>Define um novo alvo.</summary>
+    public void SetTarget(ITargetable target)
     {
-        if (newTarget == CurrentTarget) return;
+        if (CurrentTarget == target)
+            return;
 
-        // Desinscreve de eventos do alvo anterior se for EnemyBase.
-        UnsubscribeFromOldTargetEvents();
-
-        CurrentTarget = newTarget;
-
-        // Se for inimigo, assina eventos para saber se morreu.
-        SubscribeToNewTargetEvents();
-
+        CurrentTarget = target;
         OnTargetChanged?.Invoke(CurrentTarget);
     }
 
-    /// <summary>
-    /// Remove o target atual (por exemplo, botão X da HUD).
-    /// </summary>
+    /// <summary>Limpa o alvo atual.</summary>
     public void ClearTarget()
     {
-        if (CurrentTarget == null) return;
+        if (CurrentTarget == null)
+            return;
 
-        UnsubscribeFromOldTargetEvents();
         CurrentTarget = null;
         OnTargetChanged?.Invoke(null);
     }
 
     /// <summary>
-    /// Usa TAB para alternar target entre inimigos mais próximos.
+    /// Cicla o alvo com TAB (pega o mais perto dentro de um raio).
+    /// Simples: procura todos os colliders na Layer de inimigo.
     /// </summary>
-    /// <param name="playerPosition">Posição atual do player.</param>
-    /// <param name="searchRadius">Raio de busca para encontrar inimigos.</param>
-    public void CycleTargetWithTab(Vector3 playerPosition, float searchRadius)
+    public void CycleTargetWithTab(Vector3 center, float radius)
     {
-        // Encontra todos os inimigos no raio.
-        Collider2D[] hits = Physics2D.OverlapCircleAll(playerPosition, searchRadius);
+        // Pega todos os colliders 2D num raio.
+        Collider2D[] hits = Physics2D.OverlapCircleAll(center, radius);
 
-        List<ITargetable> candidates = new List<ITargetable>();
-
-        foreach (var hit in hits)
-        {
-            var targetable = hit.GetComponent<ITargetable>();
-            if (targetable != null && targetable.IsAlive)
-            {
-                candidates.Add(targetable);
-            }
-        }
-
-        if (candidates.Count == 0)
+        if (hits.Length == 0)
         {
             ClearTarget();
             return;
         }
 
-        // Ordena por distância.
-        candidates.Sort((a, b) =>
-        {
-            float da = Vector3.SqrMagnitude(a.TargetTransform.position - playerPosition);
-            float db = Vector3.SqrMagnitude(b.TargetTransform.position - playerPosition);
-            return da.CompareTo(db);
-        });
+        // Converte para lista de ITargetable válidos.
+        var targets = new System.Collections.Generic.List<ITargetable>();
 
-        // Se não há alvo ainda, pega o mais próximo.
-        if (CurrentTarget == null)
+        foreach (var col in hits)
         {
-            SetTarget(candidates[0]);
+            var t = col.GetComponent<ITargetable>();
+            if (t != null && t.IsAlive)
+                targets.Add(t);
+        }
+
+        if (targets.Count == 0)
+        {
+            ClearTarget();
             return;
         }
 
-        // Procura próximo da lista.
-        int currentIndex = candidates.FindIndex(t => t == CurrentTarget);
-
-        // Se não achar, pega o primeiro novamente.
-        if (currentIndex == -1)
+        // Se não há alvo, pega o primeiro.
+        if (CurrentTarget == null)
         {
-            SetTarget(candidates[0]);
+            SetTarget(targets[0]);
+            return;
         }
-        else
-        {
-            int nextIndex = (currentIndex + 1) % candidates.Count;
-            SetTarget(candidates[nextIndex]);
-        }
-    }
 
-    //==========================================================
-    //  EVENTOS DE MORTE DO INIMIGO
-    //==========================================================
-
-    /// <summary>
-    /// Desinscreve eventos do alvo anterior se for EnemyBase.
-    /// </summary>
-    private void UnsubscribeFromOldTargetEvents()
-    {
-        if (CurrentTarget is EnemyBase enemy)
-        {
-            enemy.OnDeath -= HandleTargetDeath;
-        }
-    }
-
-    /// <summary>
-    /// Assina eventos do novo alvo se for EnemyBase.
-    /// </summary>
-    private void SubscribeToNewTargetEvents()
-    {
-        if (CurrentTarget is EnemyBase enemy)
-        {
-            enemy.OnDeath += HandleTargetDeath;
-        }
-    }
-
-    /// <summary>
-    /// Chamado quando o alvo atual morre.
-    /// </summary>
-    private void HandleTargetDeath(EnemyBase deadEnemy)
-    {
-        // Limpa target ao morrer.
-        ClearTarget();
+        // Senão, pega o próximo depois do atual.
+        int index = targets.IndexOf(CurrentTarget);
+        index = (index + 1) % targets.Count;
+        SetTarget(targets[index]);
     }
 }

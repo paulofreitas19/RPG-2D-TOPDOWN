@@ -1,39 +1,23 @@
 using UnityEngine;
 
 /// <summary>
-/// Interface simples que representa algo que pode ser "targetado"
-/// pelo player (inimigos, NPCs, etc).
+/// Qualquer coisa que possa ser alvo do player (inimigos, NPCs etc).
 /// </summary>
 public interface ITargetable
 {
-    /// <summary>
-    /// Transform principal usado para posição / distância.
-    /// </summary>
+    /// <summary>Transform usado como referência de posição (centro do alvo).</summary>
     Transform TargetTransform { get; }
 
-    /// <summary>
-    /// Nome a ser exibido na HUD.
-    /// </summary>
+    /// <summary>Nome para exibir na HUD.</summary>
     string DisplayName { get; }
 
-    /// <summary>
-    /// Vida atual.
-    /// </summary>
+    /// <summary>Vida atual e máxima, para HUD.</summary>
     int CurrentHealth { get; }
-
-    /// <summary>
-    /// Vida máxima.
-    /// </summary>
     int MaxHealth { get; }
 
-    /// <summary>
-    /// Verdadeiro se ainda estiver vivo.
-    /// </summary>
+    /// <summary>Se o alvo ainda está vivo.</summary>
     bool IsAlive { get; }
 
-    /// <summary>
-    /// Aplica dano ao alvo.
-    /// </summary>
-    /// <param name="amount">Quantidade de dano bruto.</param>
+    /// <summary>Receber dano.</summary>
     void TakeDamage(int amount);
 }

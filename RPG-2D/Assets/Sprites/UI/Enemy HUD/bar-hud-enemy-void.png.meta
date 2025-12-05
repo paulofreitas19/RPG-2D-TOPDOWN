@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: d5314179797a4d34e858a6c1dcf9657e
+guid: c6c23e09b972429489d8e5252b877996
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2853534922608181965
-    second: enemy-hud-panel_0
+      213: 3396886819639177115
+    second: bar-hud-enemy-void_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: enemy-hud-panel_0
+      name: bar-hud-enemy-void_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1526
-        height: 1024
+        width: 1280
+        height: 212
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: dc28b38b4eac99720800000000000000
-      internalID: 2853534922608181965
+      spriteID: b9facc2a09a242f20800000000000000
+      internalID: 3396886819639177115
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      enemy-hud-panel_0: 2853534922608181965
+      bar-hud-enemy-void_0: 3396886819639177115
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
