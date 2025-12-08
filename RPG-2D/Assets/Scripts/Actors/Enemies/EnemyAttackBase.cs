@@ -2,10 +2,12 @@ using UnityEngine;
 
 /// <summary>
 /// Classe base abstrata para qualquer tipo de ataque de inimigo.
-/// Não conhece Animator, nem Brain. Apenas:
-/// - referência ao Enemy (vida / estado)
-/// - referência ao EnemyMovement (para parar / mover se precisar)
-/// Cada inimigo concreto implementa StartAttack do seu jeito.
+/// Regras:
+///  - Não usa Animator.
+///  - Não conhece o EnemyBrain.
+///  - Apenas controla: estado de ataque, cooldown e acesso ao Enemy / Movement.
+/// 
+/// Cada inimigo concreto (SlimeAttack, OrcAttack, etc) implementa StartAttack.
 /// </summary>
 [RequireComponent(typeof(Enemy))]
 [RequireComponent(typeof(EnemyMovement))]
@@ -27,7 +29,9 @@ public abstract class EnemyAttackBase : MonoBehaviour
     /// <summary>Cooldown público do ataque (lido pelo EnemyBrain).</summary>
     public float AttackCooldown => attackCooldown;
 
-    /// <summary>Se o inimigo está, neste momento, executando um ataque.</summary>
+    /// <summary>
+    /// Indica se o inimigo está atualmente realizando um ataque (usado pelo EnemyBrain).
+    /// </summary>
     public bool IsAttacking { get; protected set; }
 
     protected virtual void Awake()
@@ -37,9 +41,8 @@ public abstract class EnemyAttackBase : MonoBehaviour
     }
 
     /// <summary>
-    /// Inicia o ataque contra um alvo.
-    /// A implementação concreta (SlimeAttack, OrcAttack, etc)
-    /// decide como animar, pular, atirar, etc.
+    /// Inicia o ataque contra o alvo.
+    /// Implementações concretas definem a animação ou comportamento exato.
     /// </summary>
     public abstract void StartAttack(Transform target);
 }

@@ -10,6 +10,9 @@ public class Enemy : MonoBehaviour, ITargetable
     [SerializeField] private string displayName = "Slime"; // Nome na HUD.
     [SerializeField] private int maxHealth = 50;           // Vida máxima.
 
+    [Header("Recompensa")]
+    [SerializeField] private int xpReward = 10;            // XP dado ao player ao morrer.
+
     private int currentHealth;                             // Vida atual.
 
     // Implementação da interface ITargetable.
@@ -29,8 +32,8 @@ public class Enemy : MonoBehaviour, ITargetable
     /// </summary>
     public void TakeDamage(int amount)
     {
-        amount = Mathf.Max(0, amount);                // Garante dano >= 0.
-        currentHealth -= amount;                      // Subtrai vida.
+        amount = Mathf.Max(0, amount);
+        currentHealth -= amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
         // Atualiza HUD, se este inimigo for o alvo atual.
@@ -41,7 +44,6 @@ public class Enemy : MonoBehaviour, ITargetable
             EnemyHUDController.Instance.RefreshForTarget(this);
         }
 
-        // Morte.
         if (currentHealth <= 0)
         {
             Die();
@@ -50,8 +52,13 @@ public class Enemy : MonoBehaviour, ITargetable
 
     private void Die()
     {
+        // Dá XP ao player.
+        if (Player.Instance != null)
+        {
+            Player.Instance.GainXP(xpReward);
+        }
+
         // Aqui você pode tocar animação, soltar loot, etc.
-        // Por enquanto, só desativamos o collider.
         GetComponent<Collider2D>().enabled = false;
     }
 }

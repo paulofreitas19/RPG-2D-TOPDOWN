@@ -1,5 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
 using System.Collections;
+using UnityEngine;
 using UnityEngine.EventSystems;
 
 /// <summary>
@@ -9,10 +10,17 @@ using UnityEngine.EventSystems;
 /// - Ataque básico e skills (F1, F2...)
 /// - Auto-approach até o alcance da skill
 /// - Modo de combate + integração com HUD de inimigo
+/// - Agora também: mana, XP, level e eventos para HUD do player.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class Player : MonoBehaviour
 {
+    //==========================================================
+    //  SINGLETON
+    //==========================================================
+
+    public static Player Instance { get; private set; }
+
     //==========================================================
     //  COMPONENTES
     //==========================================================
@@ -20,9 +28,17 @@ public class Player : MonoBehaviour
     [Header("Componentes")]
     [SerializeField] private Rigidbody2D rb;              // Movimento físico 2D.
     [SerializeField] private PlayerAnim playerAnim;       // Controlador de animações.
-    [SerializeField] private EnemyHUDController enemyHud; // HUD de inimigo (no Canvas).
+    [SerializeField] private EnemyHUDController enemyHud; // HUD de inimigo (no Canvas). :contentReference[oaicite:1]{index=1}  
 
     private Camera mainCam;                               // Referência à Camera.main.
+
+    //==========================================================
+    //  IDENTIFICAÇÃO
+    //==========================================================
+
+    [Header("Identificação")]
+    [SerializeField] private string displayName = "Merlin";
+    public string DisplayName => displayName;
 
     //==========================================================
     //  MOVIMENTO (CLICK-TO-MOVE)
@@ -43,7 +59,7 @@ public class Player : MonoBehaviour
     [SerializeField] private LayerMask groundMask;          // Layer do chão.
     [SerializeField] private LayerMask enemyMask;           // Layer de inimigos (para clique).
     [SerializeField] private float tabSearchRadius = 20f;   // Raio para TAB.
-    [SerializeField] private float maxTargetDistanceToKeep = 25f; // Distância máxima para manter target.
+    [SerializeField] private float maxTargetDistanceToKeep = 25f; // Distância máx para manter target.
 
     [SerializeField] private float doubleClickThreshold = 0.25f;  // Delay para detectar duplo clique.
 
@@ -68,6 +84,7 @@ public class Player : MonoBehaviour
         public float cooldown = 2f;          // Cooldown.
         public float castTime = 0.3f;        // Tempo de conjuração.
         public int damage = 10;              // Dano causado.
+        public int manaCost = 0;             // Custo de mana (opcional).
 
         [HideInInspector] public float lastUseTime = -999f; // Última vez que foi usada.
     }
@@ -81,15 +98,48 @@ public class Player : MonoBehaviour
     private ITargetable pendingSkillTarget = null;     // Alvo da skill pendente.
 
     //==========================================================
-    //  VIDA / COMBATE
+    //  VIDA / MANA / XP
     //==========================================================
 
     [Header("Vida & Dano")]
     [SerializeField] private int maxHealth = 100;       // Vida máxima do player.
-    private int currentHealth;                          // Vida atual.
+    [SerializeField] private int currentHealth;                          // Vida atual.
+
+    [Header("Mana")]
+    [SerializeField] private int maxMana = 50;
+    private int currentMana;
+
+    [Header("Experiência / Level")]
+    [SerializeField] private int level = 1;
+    [SerializeField] private int baseXPToNextLevel = 50;
+    [SerializeField] private float xpGrowthFactor = 1.5f;
+
+    private int currentXP;
+    private int xpToNextLevel;
+
+    public int CurrentHealth => currentHealth;
+    public int MaxHealth => maxHealth;
+    public int CurrentMana => currentMana;
+    public int MaxMana => maxMana;
+    public int CurrentXP => currentXP;
+    public int XPToNextLevel => xpToNextLevel;
+    public int Level => level;
+
+    //==========================================================
+    //  EVENTOS PARA HUD
+    //==========================================================
+
+    public event Action<int, int> OnHealthChanged;          // (current, max)
+    public event Action<int, int> OnManaChanged;            // (current, max)
+    public event Action<int, int> OnXPChanged;              // (currentXP, xpToNextLevel)
+    public event Action<int> OnLevelChanged;           // (newLevel)
+
+    //==========================================================
+    //  COMBAT MODE
+    //==========================================================
 
     [Header("Combat Mode")]
-    [SerializeField] private float combatFadeTime = 5f; // Tempo sem combate para sair do modo.
+    [SerializeField] private float combatFadeTime = 5f; // Tempo sem combate p/ sair do modo.
 
     private float lastCombatTime = -999f;               // Último evento de combate.
     private bool isInCombat = false;                    // Está em modo de combate?
@@ -101,6 +151,14 @@ public class Player : MonoBehaviour
 
     private void Awake()
     {
+        // Singleton
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
         // Garante referências.
         if (rb == null) rb = GetComponent<Rigidbody2D>();
         if (playerAnim == null) playerAnim = GetComponentInChildren<PlayerAnim>();
@@ -108,25 +166,35 @@ public class Player : MonoBehaviour
 
         mainCam = Camera.main;
 
-        // Inicializa vida.
+        // Inicializa recursos
         currentHealth = maxHealth;
+        currentMana = maxMana;
+
+        // XP para o nível atual
+        xpToNextLevel = Mathf.RoundToInt(baseXPToNextLevel *
+                                         Mathf.Pow(xpGrowthFactor, level - 1));
+
+        // Dispara eventos iniciais para a HUD do player
+        RaiseHealthChanged();
+        RaiseManaChanged();
+        RaiseXPChanged();
+        OnLevelChanged?.Invoke(level);
     }
 
     private void Update()
     {
-        if (isDead) return;                    // Morto não faz nada.
+        if (isDead) return;
 
-        HandleMouseInput();                    // Clique para andar / selecionar alvo.
-        HandleKeyboardInput();                 // TAB + skills.
-        UpdateCombatMode();                    // Entrar/sair de combate.
-        UpdateAnimation();                     // Atualizar Animator.
+        HandleMouseInput();
+        HandleKeyboardInput();
+        UpdateCombatMode();
+        UpdateAnimation();
     }
 
     private void FixedUpdate()
     {
-        if (isDead) return;                    // Morto não anda.
-
-        HandleMovement();                      // Andar até o destino.
+        if (isDead) return;
+        HandleMovement();
     }
 
     //==========================================================
@@ -135,19 +203,16 @@ public class Player : MonoBehaviour
 
     private void HandleMouseInput()
     {
-        // Evita que cliques em UI sejam processados como movimento
+        // Evita que cliques em UI sejam processados como movimento.
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
         if (Input.GetMouseButtonDown(0))
         {
-            // Converte posição de tela para mundo.
             Vector3 mouseWorldPos = mainCam.ScreenToWorldPoint(Input.mousePosition);
             mouseWorldPos.z = 0f;
 
-            //--------------------------------------------------
             // 1) Tentamos clicar em um inimigo.
-            //--------------------------------------------------
             Collider2D enemyCol = Physics2D.OverlapPoint(mouseWorldPos, enemyMask);
 
             if (enemyCol != null)
@@ -156,18 +221,16 @@ public class Player : MonoBehaviour
                 if (target != null)
                 {
                     HandleClickOnEnemy(target);
-                    return; // Não processa clique no chão.
+                    return;
                 }
             }
 
-            //--------------------------------------------------
             // 2) Se não clicou em inimigo, tratamos como chão.
-            //--------------------------------------------------
             Collider2D groundCol = Physics2D.OverlapPoint(mouseWorldPos, groundMask);
 
             if (groundCol != null)
             {
-                moveDestination = mouseWorldPos; // Andar até o ponto clicado.
+                moveDestination = mouseWorldPos;
                 isAutoMoving = true;
 
                 // Não limpamos o target (comportamento Lineage-like).
@@ -177,9 +240,6 @@ public class Player : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Lógica de clique em inimigo (1x seleciona, 2x ataca).
-    /// </summary>
     private void HandleClickOnEnemy(ITargetable target)
     {
         float now = Time.time;
@@ -191,11 +251,9 @@ public class Player : MonoBehaviour
         lastClickTime = now;
         lastClickedTarget = target;
 
-        // Define alvo no TargetManager.
         if (TargetManager.Instance != null)
             TargetManager.Instance.SetTarget(target);
 
-        // Se foi duplo clique → ataca.
         if (isDoubleClick)
         {
             TryUseSkillOnTarget(basicAttack, target);
@@ -242,11 +300,15 @@ public class Player : MonoBehaviour
     {
         if (slot == null || target == null) return;
 
-        // Cooldown.
+        // Cooldown
         if (Time.time < slot.lastUseTime + slot.cooldown)
             return;
 
-        // Define como skill pendente.
+        // Mana
+        if (!TryConsumeMana(slot.manaCost))
+            return;
+
+        // Define como skill pendente
         pendingSkill = slot;
         pendingSkillTarget = target;
 
@@ -267,14 +329,14 @@ public class Player : MonoBehaviour
 
     private IEnumerator CastAndExecuteSkill(SkillSlot slot, ITargetable target)
     {
-        if (isCasting) yield break;          // Evita sobrepor casts.
+        if (isCasting) yield break;
 
         isCasting = true;
         slot.lastUseTime = Time.time;
 
-        RegisterCombatEvent();               // Entra em modo de combate.
+        RegisterCombatEvent();
 
-        isAutoMoving = false;               // Para de andar.
+        isAutoMoving = false;
         moveDestination = null;
         rb.linearVelocity = Vector2.zero;
 
@@ -305,11 +367,9 @@ public class Player : MonoBehaviour
             }
         }
 
-        // Termina cast.
         playerAnim.SetCasting(false);
         isCasting = false;
 
-        // Se essa skill era a pendente, limpa.
         if (pendingSkill == slot)
         {
             pendingSkill = null;
@@ -323,7 +383,6 @@ public class Player : MonoBehaviour
 
     private void HandleMovement()
     {
-        // Se não está andando automaticamente ou está conjurando → parado.
         if (!isAutoMoving || isCasting)
         {
             rb.linearVelocity = Vector2.zero;
@@ -340,13 +399,11 @@ public class Player : MonoBehaviour
         Vector2 currentPos = rb.position;
         Vector2 dest = moveDestination.Value;
 
-        // Direção até o destino.
         Vector2 dir = dest - currentPos;
         float distance = dir.magnitude;
 
         if (distance <= stoppingDistance)
         {
-            // Chegou.
             rb.linearVelocity = Vector2.zero;
             isAutoMoving = false;
             moveDestination = null;
@@ -367,15 +424,12 @@ public class Player : MonoBehaviour
             return;
         }
 
-        // Ainda longe → move na direção normalizada.
         Vector2 dirNorm = dir.normalized;
         rb.linearVelocity = dirNorm * moveSpeed;
 
-        // Flipa o sprite para "olhar" na direção.
         FaceTarget(dest);
     }
 
-    /// <summary>Faz o player olhar para uma posição no mundo (flip X).</summary>
     private void FaceTarget(Vector3 worldPos)
     {
         if (worldPos.x > transform.position.x)
@@ -384,7 +438,6 @@ public class Player : MonoBehaviour
             transform.localScale = new Vector3(1f, 1f, 1f);
     }
 
-    /// <summary>Atualiza Animator com base na velocidade atual.</summary>
     private void UpdateAnimation()
     {
         float speed = rb.linearVelocity.magnitude;
@@ -403,24 +456,21 @@ public class Player : MonoBehaviour
         {
             isInCombat = true;
             playerAnim.SetInCombat(true);
-            // Aqui você pode ligar ícone de espadas cruzadas na HUD do player.
+            // Aqui dá para acender o ícone de "espadas" na HUD do player, se quiser.
         }
     }
 
     private void UpdateCombatMode()
     {
-        // Sai do modo de combate após X segundos sem eventos.
         if (isInCombat && Time.time > lastCombatTime + combatFadeTime)
         {
             isInCombat = false;
             playerAnim.SetInCombat(false);
 
-            // HUD do inimigo pode voltar orbs para estado neutro.
             if (enemyHud != null)
                 enemyHud.SetOrbsInCombat(false);
         }
 
-        // Se o alvo se afastar demais, limpa target.
         if (TargetManager.Instance != null)
         {
             ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
@@ -444,12 +494,12 @@ public class Player : MonoBehaviour
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
         RegisterCombatEvent();
+        RaiseHealthChanged();
 
         if (currentHealth <= 0)
             Die();
     }
 
-    /// <summary>Morte do player.</summary>
     private void Die()
     {
         isAutoMoving = false;
@@ -459,9 +509,80 @@ public class Player : MonoBehaviour
 
         isDead = true;
 
-        // Animação de morte, se quiser.
         playerAnim.PlayDeath();
-
         Debug.Log("PLAYER MORREU");
+    }
+
+    //==========================================================
+    //  MANA / XP
+    //==========================================================
+
+    /// <summary>Tenta consumir mana. Retorna true se conseguiu.</summary>
+    public bool TryConsumeMana(int amount)
+    {
+        if (amount <= 0) return true;
+
+        if (currentMana < amount)
+            return false;
+
+        currentMana -= amount;
+        currentMana = Mathf.Clamp(currentMana, 0, maxMana);
+        RaiseManaChanged();
+        return true;
+    }
+
+    public void RestoreMana(int amount)
+    {
+        if (amount <= 0) return;
+
+        currentMana += amount;
+        currentMana = Mathf.Clamp(currentMana, 0, maxMana);
+        RaiseManaChanged();
+    }
+
+    /// <summary>Ganha experiência (usado pelos inimigos ao morrer).</summary>
+    public void GainXP(int amount)
+    {
+        if (amount <= 0 || isDead) return;
+
+        currentXP += amount;
+
+        bool leveledUp = false;
+
+        while (currentXP >= xpToNextLevel)
+        {
+            currentXP -= xpToNextLevel;
+            level++;
+            leveledUp = true;
+
+            xpToNextLevel = Mathf.RoundToInt(baseXPToNextLevel *
+                                             Mathf.Pow(xpGrowthFactor, level - 1));
+        }
+
+        RaiseXPChanged();
+
+        if (leveledUp)
+        {
+            OnLevelChanged?.Invoke(level);
+        }
+    }
+
+    //==========================================================
+    //  HELPERS DE EVENTO
+    //==========================================================
+
+    private void RaiseHealthChanged()
+    {
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+    }
+
+    private void RaiseManaChanged()
+    {
+        OnManaChanged?.Invoke(currentMana, maxMana);
+    }
+
+    private void RaiseXPChanged()
+    {
+        OnXPChanged?.Invoke(currentXP, xpToNextLevel);
     }
 }
