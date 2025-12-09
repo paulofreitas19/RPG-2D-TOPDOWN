@@ -89,6 +89,11 @@ public class Player : MonoBehaviour
         [HideInInspector] public float lastUseTime = -999f; // Última vez que foi usada.
     }
 
+    // Controle de auto-ataque
+    private bool isAutoAttacking = false;
+    private Coroutine autoAttackRoutine = null;
+
+
     [Header("Skills")]
     [SerializeField] private SkillSlot basicAttack;     // Skill usada no duplo clique.
     [SerializeField] private SkillSlot[] skills;        // Skills extras (F1, F2...).
@@ -256,7 +261,8 @@ public class Player : MonoBehaviour
 
         if (isDoubleClick)
         {
-            TryUseSkillOnTarget(basicAttack, target);
+            StopBasicAttack(); // sempre reinicia o loop
+            autoAttackRoutine = StartCoroutine(BasicAttackLoop(target));
         }
     }
 
@@ -270,6 +276,32 @@ public class Player : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Tab) && TargetManager.Instance != null)
         {
             TargetManager.Instance.CycleTargetWithTab(transform.position, tabSearchRadius);
+        }
+
+        if (Input.GetKeyDown(basicAttack.key))
+        {
+            ITargetable t = TargetManager.Instance?.CurrentTarget;
+
+            if (t != null && t.IsAlive)
+            {
+                StopBasicAttack();
+                autoAttackRoutine = StartCoroutine(BasicAttackLoop(t));
+            }
+        }
+
+        // --------------------------------------------------
+        //  ATAQUE BÁSICO PELO TECLADO (ex: F1)
+        // --------------------------------------------------
+        if (Input.GetKeyDown(basicAttack.key))
+        {
+            ITargetable currentTarget = TargetManager.Instance != null
+                ? TargetManager.Instance.CurrentTarget
+                : null;
+
+            if (currentTarget != null && currentTarget.IsAlive)
+            {
+                TryUseSkillOnTarget(basicAttack, currentTarget);
+            }
         }
 
         // Skills adicionais (F1/F2/F3...).
@@ -312,7 +344,7 @@ public class Player : MonoBehaviour
         pendingSkill = slot;
         pendingSkillTarget = target;
 
-        float dist = Vector3.Distance(transform.position, target.TargetTransform.position);
+        float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
 
         if (dist > slot.range)
         {
@@ -485,6 +517,54 @@ public class Player : MonoBehaviour
             }
         }
     }
+
+    private IEnumerator BasicAttackLoop(ITargetable target)
+    {
+        isAutoAttacking = true;
+
+        while (isAutoAttacking)
+        {
+            // Se o alvo morreu, encerra
+            if (target == null || !target.IsAlive)
+            {
+                StopBasicAttack();
+                yield break;
+            }
+
+            float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
+
+            // Se está longe demais → aproximar
+            if (dist > basicAttack.range)
+            {
+                moveDestination = target.TargetTransform.position;
+                isAutoMoving = true;
+            }
+            else
+            {
+                // Está em alcance → ataca
+                yield return CastAndExecuteSkill(basicAttack, target);
+
+                // Cooldown entre ataques automáticos
+                yield return new WaitForSeconds(basicAttack.cooldown);
+            }
+
+            yield return null;
+        }
+    }
+
+
+    public void StopBasicAttack()
+    {
+        isAutoAttacking = false;
+
+        if (autoAttackRoutine != null)
+        {
+            StopCoroutine(autoAttackRoutine);
+            autoAttackRoutine = null;
+        }
+    }
+
+
 
     /// <summary>Receber dano.</summary>
     public void TakeDamage(int amount)

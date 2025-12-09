@@ -1,4 +1,5 @@
-using UnityEngine;
+Ôªøusing UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// Inimigo simples que pode ser alvo do player e aparece na EnemyHUD.
@@ -6,16 +7,16 @@ using UnityEngine;
 [RequireComponent(typeof(Collider2D))]
 public class Enemy : MonoBehaviour, ITargetable
 {
-    [Header("ConfiguraÁ„o")]
+    [Header("Configura√ß√£o")]
     [SerializeField] private string displayName = "Slime"; // Nome na HUD.
-    [SerializeField] private int maxHealth = 50;           // Vida m·xima.
+    [SerializeField] private int maxHealth = 50;           // Vida m√°xima.
 
     [Header("Recompensa")]
     [SerializeField] private int xpReward = 10;            // XP dado ao player ao morrer.
 
-    private int currentHealth;                             // Vida atual.
+    [SerializeField] private int currentHealth;                             // Vida atual.
 
-    // ImplementaÁ„o da interface ITargetable.
+    // Implementa√ß√£o da interface ITargetable.
     public Transform TargetTransform => transform;
     public string DisplayName => displayName;
     public int CurrentHealth => currentHealth;
@@ -52,13 +53,27 @@ public class Enemy : MonoBehaviour, ITargetable
 
     private void Die()
     {
-        // D· XP ao player.
         if (Player.Instance != null)
-        {
             Player.Instance.GainXP(xpReward);
-        }
 
-        // Aqui vocÍ pode tocar animaÁ„o, soltar loot, etc.
+        // Para o inimigo n√£o interagir mais
         GetComponent<Collider2D>().enabled = false;
+
+        // Para garantir que a IA pare
+        if (TryGetComponent<EnemyBrain>(out var brain))
+            brain.enabled = false;
+
+        // CONFIAMOS que EnemyAnimator vai tocar a anima√ß√£o,
+        // ent√£o s√≥ destru√≠mos depois.
+        StartCoroutine(DestroyAfterDeathAnimation());
     }
+
+    private IEnumerator DestroyAfterDeathAnimation()
+    {
+        // Tempo da anima√ß√£o "Die" ‚Üí ajuste se necess√°rio
+        yield return new WaitForSeconds(1.0f);
+
+        Destroy(gameObject);
+    }
+
 }

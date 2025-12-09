@@ -6,7 +6,7 @@ using UnityEngine;
 public interface ITargetable
 {
     /// <summary>Transform usado como referência de posição (centro do alvo).</summary>
-    Transform TargetTransform { get; }
+    Transform TargetTransform { get; } // Onde o player deve mirar
 
     /// <summary>Nome para exibir na HUD.</summary>
     string DisplayName { get; }
