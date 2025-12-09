@@ -1225,7 +1225,7 @@ RectTransform:
   m_GameObject: {fileID: 536035786}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.06294862, y: 0.06294862, z: 0.06294862}
+  m_LocalScale: {x: 0.080259494, y: 0.06294862, z: 0.06294862}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 726127317}
@@ -1459,16 +1459,16 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 726127316}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.28625, y: 1, z: 1}
+  m_LocalScale: {x: 1.0088235, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 536035787}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: -0.00025701523, y: 0.00016784668}
   m_SizeDelta: {x: 1280, y: 212}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &726127318
@@ -1492,10 +1492,10 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_Sprite: {fileID: -1601598349625537165, guid: fe41bb464cdb3fc48b7d1b10f52f5a74, type: 3}
-  m_Type: 0
+  m_Type: 3
   m_PreserveAspect: 1
   m_FillCenter: 1
-  m_FillMethod: 4
+  m_FillMethod: 0
   m_FillAmount: 1
   m_FillClockwise: 1
   m_FillOrigin: 0
@@ -1665,7 +1665,7 @@ MonoBehaviour:
   - {fileID: 1492587956}
   - {fileID: 1816567167}
   - {fileID: 1134699782}
-  waitAtPointTime: 10
+  waitAtPointTime: 5
 --- !u!114 &822544798
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1695,6 +1695,9 @@ MonoBehaviour:
   displayName: Slime
   maxHealth: 50
   xpReward: 10
+  currentHealth: 0
+  deathAnimDuration: 0.5
+  fadeOutDuration: 0.6
 --- !u!1 &826145330
 GameObject:
   m_ObjectHideFlags: 0
@@ -2046,7 +2049,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -298, y: 56.6}
+  m_AnchoredPosition: {x: -312, y: 69}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1047929100
@@ -2063,7 +2066,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHUDController
   panelRoot: {fileID: 983568001}
   nameText: {fileID: 378311811}
-  levelText: {fileID: 440652327}
+  levelText: {fileID: 0}
   hpFill: {fileID: 1373663239}
   mpFill: {fileID: 1134001152}
   xpFill: {fileID: 1037935066}
@@ -2396,7 +2399,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 10, y: 84.8}
+  m_AnchoredPosition: {x: 10, y: 106}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1201711540
@@ -2413,8 +2416,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   panelRoot: {fileID: 1201711538}
   nameText: {fileID: 98179785}
-  healthFill: {fileID: 536035788}
-  fullBarSprite: {fileID: 726127318}
+  healthFill: {fileID: 726127318}
+  fullBarSprite: {fileID: 536035788}
   closeButton: {fileID: 1825202412}
   combatOrbs: []
   orbIdleColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
