@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 /// <summary>
 /// Controla a HUD do Player (nome, level, HP, MP, XP).
@@ -12,7 +13,7 @@ public class PlayerHUDController : MonoBehaviour
     [Header("Referências")]
     [SerializeField] private GameObject panelRoot;  // Painel inteiro (frame de madeira).
     [SerializeField] private Text nameText;         // Nome do player (ex: MERLIN).
-    [SerializeField] private Text levelText;        // Level (ex: Level: 5).
+    [SerializeField] private TextMeshProUGUI levelText;        // Level (ex: Level: 5).
 
     [Header("Barras")]
     [SerializeField] private Image hpFill;          // Barra de vida (type = Filled, Horizontal).
@@ -113,6 +114,6 @@ public class PlayerHUDController : MonoBehaviour
     private void HandleLevelChanged(int newLevel)
     {
         if (levelText != null)
-            levelText.text = $"Level: {newLevel}";
+            levelText.text = $"{newLevel}";
     }
 }
