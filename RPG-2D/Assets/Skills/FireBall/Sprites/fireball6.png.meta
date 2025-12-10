@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: e892b32c675c2f64687b997ab49f4280
+guid: e24e1d80b614be9449042fd2fad2d9ac
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5240615596922460295
-    second: fireball1_0
+      213: 6246174000875200229
+    second: ChatGPT Image 10 de dez. de 2025, 09_16_52_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: fireball1_0
+      name: ChatGPT Image 10 de dez. de 2025, 09_16_52_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1024
-        height: 1024
+        width: 961
+        height: 512
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 977a01d61e79547b0800000000000000
-      internalID: -5240615596922460295
+      spriteID: 5ee527ff82edea650800000000000000
+      internalID: 6246174000875200229
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 3da7ace8187ecc24f9fdf1e5eff11001
     internalID: 0
     vertices: []
     indices: 
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      fireball1_0: -5240615596922460295
+      ChatGPT Image 10 de dez. de 2025, 09_16_52_0: 6246174000875200229
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

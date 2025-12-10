@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad74e07a540527642a6a59a3ad9c9e59, type: 3}
+  m_Name: FireBall
+  m_EditorClassIdentifier: Assembly-CSharp::FireBallSkill
+  skillName: FireBall
+  castTime: 1.2
+  skillPrefab: {fileID: 9143907712053440600, guid: c8afb65e9b5d37243ba2b3bd54c15d30, type: 3}
+  icon: {fileID: 0}
+  speed: 10
+  damage: 50

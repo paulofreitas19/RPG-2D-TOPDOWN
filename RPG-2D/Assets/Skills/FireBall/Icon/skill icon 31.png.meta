@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 3b7a565cd79713547bb3e82e0db3cafb
+guid: 0c922c5e84ac0c04387c3a9d34dc6fc1
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1749308762461260167
-    second: fireball4_0
+      213: 1783882552325120560
+    second: skill icon 31_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: fireball4_0
+      name: skill icon 31_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1024
-        height: 1024
+        width: 256
+        height: 256
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 976b403e2f439b7e0800000000000000
-      internalID: -1749308762461260167
+      spriteID: 0322b5cdabf91c810800000000000000
+      internalID: 1783882552325120560
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      fireball4_0: -1749308762461260167
+      skill icon 31_0: 1783882552325120560
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
