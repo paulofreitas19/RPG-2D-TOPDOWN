@@ -2469,7 +2469,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1068883251}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 460d6d83780717b47981648873ed7330, type: 3}
+  m_Script: {fileID: 11500000, guid: e65231a23f056a2458142e68cff63e3e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSkills
   skills:

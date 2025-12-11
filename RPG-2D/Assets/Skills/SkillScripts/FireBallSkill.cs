@@ -1,23 +1,44 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "FireBallSkill", menuName = "Skills/FireBallSkill")]
+[CreateAssetMenu(menuName = "Skills/Fireball Skill")]
 public class FireBallSkill : SkillBase
 {
-    public GameObject projectilePrefab; // Prefab da fireball
+    public float speed;
+    public float damage;
 
-    // MÃ©todo de ativaÃ§Ã£o da habilidade
-    public override void Activate(SkillCaster caster)
+    // Referência da instância criada durante o cast
+    private FireBallProjectile projectileInstance;
+
+    /// <summary>
+    /// Chamado no início da conjuração.
+    /// Aqui instanciamos a fireball parada e tocamos idle-cast.
+    /// </summary>
+    public override void Prepare(GameObject caster, Transform target)
     {
-        Transform spawnPoint = caster.magicPointSide; // Ponto lateral, pode adaptar para cima tambÃ©m
+        // Instancia a fireball no ponto de magia do player
+        GameObject obj = Instantiate(
+            skillPrefab,
+            caster.transform.position,
+            Quaternion.identity
+        );
 
-        GameObject projectile = Instantiate(projectilePrefab, spawnPoint.position, Quaternion.identity);
-        FireBallProjectile fireball = projectile.GetComponent<FireBallProjectile>();
-        fireball.SetTarget(caster.target); // Define o alvo da magia
+        // Guarda referência do projétil
+        projectileInstance = obj.GetComponent<FireBallProjectile>();
+
+        // Inicializa SEM lançar ainda
+        projectileInstance.Init(target, speed, damage);
     }
 
-    // PreparaÃ§Ã£o da habilidade (animaÃ§Ã£o de cast)
-    public override void Prepare(SkillCaster caster)
+    /// <summary>
+    /// Chamado após o tempo de cast.
+    /// Aqui a fireball começa a se mover (shoot).
+    /// </summary>
+    public override void Activate(GameObject caster, Transform target)
     {
-        caster.GetComponent<Animator>().SetTrigger("cast");
+        // Dispara a fireball somente após o cast
+        if (projectileInstance != null)
+        {
+            projectileInstance.Launch();
+        }
     }
 }

@@ -1,41 +1,37 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 public class SkillCaster : MonoBehaviour
 {
-    private SkillBase currentSkill; // Habilidade atual sendo conjurada
-    private bool isCasting = false; // Controle de conjuração
-    private Animator animator; // Referência ao Animator
+    private Animator animator;
+    private PlayerAnim playerAnim;
 
-    [Header("Pontos de Spawn da Magia")]
-    public Transform magicPointSide;
-    public Transform magicPointTop;
-
-    [Header("Alvo da magia")]
-    public Transform target;
-
-    void Start()
+    private void Awake()
     {
-        animator = GetComponent<Animator>(); // Captura o Animator do jogador
+        animator = GetComponentInChildren<Animator>();
+        playerAnim = GetComponentInChildren<PlayerAnim>();
     }
 
-    // Tenta conjurar uma habilidade
-    public void TryCastSkill(SkillBase skill)
+    public void CastSkill(SkillBase skill, Transform target)
     {
-        if (!isCasting)
-        {
-            currentSkill = skill;
-            StartCoroutine(CastCoroutine());
-        }
+        StartCoroutine(Cast(skill, target));
     }
 
-    // Corroutine responsável pela preparação e ativação
-    private IEnumerator CastCoroutine()
+    private IEnumerator Cast(SkillBase skill, Transform target)
     {
-        isCasting = true;
-        currentSkill.Prepare(this);
-        yield return new WaitForSeconds(currentSkill.castTime); // Tempo de conjuração
-        currentSkill.Activate(this);
-        isCasting = false;
+        playerAnim.SetCasting(true);
+
+        // 🔹 Começa animação do player
+        animator.SetTrigger("idleCast");
+
+        // 🔹 Prepara a skill (instancia e mostra a Fireball parada)
+        skill.Prepare(gameObject, target);
+
+        yield return new WaitForSeconds(skill.castTime);
+
+        // 🔹 Termina cast, dispara a skill
+        skill.Activate(gameObject, target);
+
+        playerAnim.SetCasting(false);
     }
 }

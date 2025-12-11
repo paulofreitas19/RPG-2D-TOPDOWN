@@ -2,11 +2,12 @@ using UnityEngine;
 
 public abstract class SkillBase : ScriptableObject
 {
-    public float castTime = 0.5f; // Tempo de conjuração
+    public string skillName;
+    public float castTime;
+    public GameObject skillPrefab;
+    public Sprite icon;
 
-    // Preparação da habilidade (ex: animação)
-    public abstract void Prepare(SkillCaster caster);
+    public virtual void Prepare(GameObject caster, Transform target) { }
 
-    // Execução da habilidade
-    public abstract void Activate(SkillCaster caster);
+    public abstract void Activate(GameObject caster, Transform target);
 }

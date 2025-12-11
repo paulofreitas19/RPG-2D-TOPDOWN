@@ -2,36 +2,46 @@ using UnityEngine;
 
 public class FireBallProjectile : MonoBehaviour
 {
-    public float speed = 5f;
-    public GameObject explosionEffect;
+    [SerializeField] private Animator animator;
+    [SerializeField] private float destroyAfter = 2f;
+
     private Transform target;
+    private float speed;
+    private float damage;
+    private bool isLaunched = false;
 
-    // Define o alvo da fireball
-    public void SetTarget(Transform newTarget)
+    public void Init(Transform target, float speed, float damage)
     {
-        target = newTarget;
+        this.target = target;
+        this.speed = speed;
+        this.damage = damage;
+
+        // Idle-cast já é o estado inicial no Animator
+        // A Fireball aparece parada
     }
 
-    void Update()
+    public void Launch()
     {
-        if (target == null)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Vector3 direction = (target.position - transform.position).normalized;
-        transform.position += direction * speed * Time.deltaTime;
+        isLaunched = true;
+        animator.SetTrigger("castComp"); // Troca de idle-cast para shoot
     }
 
-    void OnTriggerEnter2D(Collider2D collision)
+    private void Update()
     {
-        if (collision.transform == target)
-        {
-            if (explosionEffect != null)
-                Instantiate(explosionEffect, transform.position, Quaternion.identity);
+        if (!isLaunched || target == null) return;
 
-            Destroy(gameObject);
+        // Move em direção ao alvo
+        transform.position = Vector2.MoveTowards(transform.position, target.position, speed * Time.deltaTime);
+
+        // Detecta se chegou no inimigo
+        if (Vector3.Distance(transform.position, target.position) < 0.1f)
+        {
+            // Chama a animação de explosão
+            animator.SetTrigger("explode");
+            isLaunched = false;
+
+            // Destruir após animação (pode usar animation event também)
+            Destroy(gameObject, destroyAfter);
         }
     }
 }
