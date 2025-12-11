@@ -23,7 +23,7 @@ public class FireBallProjectile : MonoBehaviour
     public void Launch()
     {
         isLaunched = true;
-        animator.SetTrigger("castComp"); // Troca de idle-cast para shoot
+        animator.SetTrigger("castComplete"); // Troca de idle-cast para shoot
     }
 
     private void Update()
