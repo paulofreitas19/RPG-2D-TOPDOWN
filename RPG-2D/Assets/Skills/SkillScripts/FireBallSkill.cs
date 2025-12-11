@@ -1,15 +1,23 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Skills/Fireball Skill")]
+[CreateAssetMenu(fileName = "FireBallSkill", menuName = "Skills/FireBallSkill")]
 public class FireBallSkill : SkillBase
 {
-    public float speed;
-    public float damage;
+    public GameObject projectilePrefab; // Prefab da fireball
 
-    public override void Activate(GameObject caster, Transform target)
+    // Método de ativação da habilidade
+    public override void Activate(SkillCaster caster)
     {
-        GameObject obj = Instantiate(skillPrefab, caster.transform.position, Quaternion.identity);
-        FireBallProjectile proj = obj.GetComponent<FireBallProjectile>();
-        proj.Init(target, speed, damage);
+        Transform spawnPoint = caster.magicPointSide; // Ponto lateral, pode adaptar para cima também
+
+        GameObject projectile = Instantiate(projectilePrefab, spawnPoint.position, Quaternion.identity);
+        FireBallProjectile fireball = projectile.GetComponent<FireBallProjectile>();
+        fireball.SetTarget(caster.target); // Define o alvo da magia
+    }
+
+    // Preparação da habilidade (animação de cast)
+    public override void Prepare(SkillCaster caster)
+    {
+        caster.GetComponent<Animator>().SetTrigger("cast");
     }
 }

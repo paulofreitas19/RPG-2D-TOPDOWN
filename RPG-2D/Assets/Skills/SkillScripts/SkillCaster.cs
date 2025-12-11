@@ -3,17 +3,39 @@ using UnityEngine;
 
 public class SkillCaster : MonoBehaviour
 {
-    public void CastSkill(SkillBase skill, Transform target)
+    private SkillBase currentSkill; // Habilidade atual sendo conjurada
+    private bool isCasting = false; // Controle de conjuração
+    private Animator animator; // Referência ao Animator
+
+    [Header("Pontos de Spawn da Magia")]
+    public Transform magicPointSide;
+    public Transform magicPointTop;
+
+    [Header("Alvo da magia")]
+    public Transform target;
+
+    void Start()
     {
-        StartCoroutine(Cast(skill, target));
+        animator = GetComponent<Animator>(); // Captura o Animator do jogador
     }
 
-    private IEnumerator Cast(SkillBase skill, Transform target)
+    // Tenta conjurar uma habilidade
+    public void TryCastSkill(SkillBase skill)
     {
-        // Anima��o de cast (at� frame 4 por exemplo)
-        Debug.Log($"Casting {skill.skillName}...");
-        yield return new WaitForSeconds(skill.castTime);
+        if (!isCasting)
+        {
+            currentSkill = skill;
+            StartCoroutine(CastCoroutine());
+        }
+    }
 
-        skill.Activate(gameObject, target);
+    // Corroutine responsável pela preparação e ativação
+    private IEnumerator CastCoroutine()
+    {
+        isCasting = true;
+        currentSkill.Prepare(this);
+        yield return new WaitForSeconds(currentSkill.castTime); // Tempo de conjuração
+        currentSkill.Activate(this);
+        isCasting = false;
     }
 }
