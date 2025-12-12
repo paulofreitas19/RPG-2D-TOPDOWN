@@ -15,19 +15,24 @@ public class FireBallSkill : SkillBase
     /// </summary>
     public override void Prepare(GameObject caster, Transform target)
     {
-        // Instancia a fireball no ponto de magia do player
-        GameObject obj = Instantiate(
-            skillPrefab,
-            caster.transform.position,
-            Quaternion.identity
-        );
+        // Tenta pegar o ponto de conjuração (mão) pelo SkillCaster do player
+        SkillCaster casterComp = caster.GetComponent<SkillCaster>();
 
-        // Guarda referência do projétil
+        Transform castPoint =
+            (casterComp != null && casterComp.MagicAttackPoint != null)
+            ? casterComp.MagicAttackPoint
+            : caster.transform; // fallback seguro
+
+        // Instancia na mão
+        GameObject obj = Instantiate(skillPrefab, castPoint.position, castPoint.rotation);
+
+        // Enquanto está "carregando" (idle cast), gruda na mão
+        obj.transform.SetParent(castPoint, true);
+
         projectileInstance = obj.GetComponent<FireBallProjectile>();
-
-        // Inicializa SEM lançar ainda
         projectileInstance.Init(target, speed, damage);
     }
+
 
     /// <summary>
     /// Chamado após o tempo de cast.
@@ -38,6 +43,9 @@ public class FireBallSkill : SkillBase
         // Dispara a fireball somente após o cast
         if (projectileInstance != null)
         {
+            // Solta da mão antes de lançar
+            projectileInstance.transform.SetParent(null, true);
+
             projectileInstance.Launch();
         }
     }

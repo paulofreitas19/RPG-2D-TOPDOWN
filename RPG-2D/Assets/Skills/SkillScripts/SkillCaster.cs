@@ -6,6 +6,10 @@ public class SkillCaster : MonoBehaviour
     private Animator animator;
     private PlayerAnim playerAnim;
 
+    [SerializeField] private Transform magicAttackPoint;
+
+    public Transform MagicAttackPoint => magicAttackPoint;
+
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();

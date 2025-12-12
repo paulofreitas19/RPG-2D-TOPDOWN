@@ -388,7 +388,7 @@ GameObject:
   m_Component:
   - component: {fileID: 205365767}
   m_Layer: 6
-  m_Name: MagicPointSide
+  m_Name: MagicPointAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -403,7 +403,7 @@ Transform:
   m_GameObject: {fileID: 205365766}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.28, y: 1.59, z: 0}
+  m_LocalPosition: {x: 1.13, y: 1.36, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2460,6 +2460,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1858ec2c8a85904eae3e2ff54707abc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SkillCaster
+  magicAttackPoint: {fileID: 205365767}
 --- !u!114 &1068883258
 MonoBehaviour:
   m_ObjectHideFlags: 0
