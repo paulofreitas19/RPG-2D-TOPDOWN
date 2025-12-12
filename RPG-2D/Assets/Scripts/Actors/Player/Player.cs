@@ -29,6 +29,7 @@ public class Player : MonoBehaviour
     [SerializeField] private Rigidbody2D rb;              // Movimento físico 2D.
     [SerializeField] private PlayerAnim playerAnim;       // Controlador de animações.
     [SerializeField] private EnemyHUDController enemyHud; // HUD de inimigo (no Canvas). :contentReference[oaicite:1]{index=1}  
+    [SerializeField] private SpriteFlipper spriteFlipper; // 👈 NOVO (controle visual de direção)
 
     private Camera mainCam;                               // Referência à Camera.main.
 
@@ -168,6 +169,8 @@ public class Player : MonoBehaviour
         if (rb == null) rb = GetComponent<Rigidbody2D>();
         if (playerAnim == null) playerAnim = GetComponentInChildren<PlayerAnim>();
         if (enemyHud == null) enemyHud = EnemyHUDController.Instance;
+        if (spriteFlipper == null) spriteFlipper = GetComponentInChildren<SpriteFlipper>();
+
 
         mainCam = Camera.main;
 
@@ -462,12 +465,16 @@ public class Player : MonoBehaviour
         FaceTarget(dest);
     }
 
+    //==========================================================
+    //  ORIENTAÇÃO VISUAL (SEM MEXER NO TRANSFORM)
+    //==========================================================
+
     private void FaceTarget(Vector3 worldPos)
     {
-        if (worldPos.x > transform.position.x)
-            transform.localScale = new Vector3(-1f, 1f, 1f);
-        else
-            transform.localScale = new Vector3(1f, 1f, 1f);
+        if (spriteFlipper == null) return;
+
+        float dirX = worldPos.x - transform.position.x;
+        spriteFlipper.FaceDirection(dirX);
     }
 
     private void UpdateAnimation()
