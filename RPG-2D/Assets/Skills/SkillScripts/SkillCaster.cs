@@ -23,6 +23,7 @@ public class SkillCaster : MonoBehaviour
 
     private IEnumerator Cast(SkillBase skill, Transform target)
     {
+        // 🟣 Fase 1 — Cast
         playerAnim.SetCasting(true);
 
         // 🔹 Começa animação do player
@@ -33,9 +34,13 @@ public class SkillCaster : MonoBehaviour
 
         yield return new WaitForSeconds(skill.castTime);
 
-        // 🔹 Termina cast, dispara a skill
+        // 🔥 Fase 2 — Shoot
         skill.Activate(gameObject, target);
 
+        // 🔴 Dispara animação de ataque básico
+        playerAnim.PlayBasicAttack();
+
+        // 🟢 Sai do estado de cast
         playerAnim.SetCasting(false);
     }
 }

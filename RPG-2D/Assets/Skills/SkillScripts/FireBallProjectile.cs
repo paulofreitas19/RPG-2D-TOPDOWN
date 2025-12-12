@@ -1,14 +1,16 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class FireBallProjectile : MonoBehaviour
 {
     [SerializeField] private Animator animator;
-    [SerializeField] private float destroyAfter = 2f;
+    [SerializeField] private float destroyAfter = 1.818f;
 
     private Transform target;
     private float speed;
     private float damage;
     private bool isLaunched = false;
+    private bool hasHit = false;
+
 
     public void Init(Transform target, float speed, float damage)
     {
@@ -16,7 +18,7 @@ public class FireBallProjectile : MonoBehaviour
         this.speed = speed;
         this.damage = damage;
 
-        // Idle-cast já é o estado inicial no Animator
+        // Idle-cast jÃ¡ Ã© o estado inicial no Animator
         // A Fireball aparece parada
     }
 
@@ -26,22 +28,39 @@ public class FireBallProjectile : MonoBehaviour
         animator.SetTrigger("castComplete"); // Troca de idle-cast para shoot
     }
 
+    private void OnHitTarget()
+    {
+        hasHit = true;
+        isLaunched = false;
+
+        // ðŸ›‘ Desativa colisÃ£o â€” nÃ£o Ã© mais um projÃ©til
+        Collider2D col = GetComponent<Collider2D>();
+        if (col != null)
+            col.enabled = false;
+
+        // ðŸ”¥ Gruda no inimigo (ancora no centro)
+        transform.SetParent(target);
+        transform.localPosition = Vector3.zero;
+
+        // ðŸ”¥ Dispara animaÃ§Ã£o de explosÃ£o
+        animator.SetTrigger("explode");
+
+        // ðŸ”¥ Destroi apÃ³s a animaÃ§Ã£o
+        Destroy(gameObject, destroyAfter);
+    }
+
+
     private void Update()
     {
         if (!isLaunched || target == null) return;
 
-        // Move em direção ao alvo
+        // Move em direÃ§Ã£o ao alvo
         transform.position = Vector2.MoveTowards(transform.position, target.position, speed * Time.deltaTime);
 
         // Detecta se chegou no inimigo
         if (Vector3.Distance(transform.position, target.position) < 0.1f)
         {
-            // Chama a animação de explosão
-            animator.SetTrigger("explode");
-            isLaunched = false;
-
-            // Destruir após animação (pode usar animation event também)
-            Destroy(gameObject, destroyAfter);
+            OnHitTarget();
         }
     }
 }
