@@ -16,22 +16,18 @@ using UnityEngine.EventSystems;
 public class Player : MonoBehaviour
 {
     //==========================================================
-    //  SINGLETON
-    //==========================================================
-
-    public static Player Instance { get; private set; }
-
-    //==========================================================
-    //  COMPONENTES
+    //  REFERENCES (componentes / integrações)
     //==========================================================
 
     [Header("Componentes")]
-    [SerializeField] private Rigidbody2D rb;              // Movimento físico 2D.
-    [SerializeField] private PlayerAnim playerAnim;       // Controlador de animações.
-    [SerializeField] private EnemyHUDController enemyHud; // HUD de inimigo (no Canvas). :contentReference[oaicite:1]{index=1}  
-    [SerializeField] private SpriteFlipper spriteFlipper; // 👈 NOVO (controle visual de direção)
+    [SerializeField] private Rigidbody2D rb;
+    [SerializeField] private PlayerAnim playerAnim;
+    [SerializeField] private EnemyHUDController enemyHud;
 
-    private Camera mainCam;                               // Referência à Camera.main.
+    // OBS: SpriteFlipper é o “oráculo” do facing.
+    // Ele é o único autorizado a flipar o SpriteRenderer,
+    // e opcionalmente reposicionar o MagicPointAttack (spawnpoint).
+    [SerializeField] private SpriteFlipper spriteFlipper;
 
     //==========================================================
     //  IDENTIFICAÇÃO
@@ -47,320 +43,260 @@ public class Player : MonoBehaviour
 
     [Header("Movimento")]
     [SerializeField] private float moveSpeed = 3f;          // Velocidade de caminhada.
-    [SerializeField] private float stoppingDistance = 0.1f; // Distância mínima para "cheguei".
+    [SerializeField] private float stoppingDistance = 0.1f; // Distância para parar perto do destino.
 
-    private Vector3? moveDestination = null;                // Ponto para onde estamos indo.
-    private bool isAutoMoving = false;                      // Se o player está em movimento automático.
+    private bool isAutoMoving = false;
+    private Vector2? moveDestination = null;
 
     //==========================================================
-    //  TARGET & INPUT DE MOUSE
+    //  TARGET / INPUT
     //==========================================================
 
     [Header("Target / Input")]
-    [SerializeField] private LayerMask groundMask;          // Layer do chão.
-    [SerializeField] private LayerMask enemyMask;           // Layer de inimigos (para clique).
-    [SerializeField] private float tabSearchRadius = 20f;   // Raio para TAB.
-    [SerializeField] private float maxTargetDistanceToKeep = 25f; // Distância máx para manter target.
+    [SerializeField] private LayerMask enemyMask;
+    [SerializeField] private float tabSearchRadius = 20f;
+    [SerializeField] private float maxTargetDistanceToKeep = 25f;
 
-    [SerializeField] private float doubleClickThreshold = 0.25f;  // Delay para detectar duplo clique.
+    [Header("Double Click")]
+    [SerializeField] private float doubleClickThreshold = 0.25f;
 
-    private float lastClickTime = -999f;                   // Momento do último clique no inimigo.
-    private ITargetable lastClickedTarget = null;          // Último alvo clicado.
+    private float lastClickTime = -1f;
+    private ITargetable lastClickedTarget = null;
 
     //==========================================================
-    //  SKILLS E ATAQUES
+    //  SKILLS / COMBATE
     //==========================================================
 
-    [System.Serializable]
+    [Serializable]
     public class SkillSlot
     {
         [Header("Identificação")]
-        public string skillName = "Skill";   // Nome para debug.
+        public string skillName = "Skill";
 
         [Header("Tecla")]
-        public KeyCode key = KeyCode.F1;     // Tecla para disparar a skill.
+        public KeyCode key = KeyCode.F1;
 
         [Header("Combate")]
-        public float range = 1.7f;           // Alcance da skill.
-        public float cooldown = 2f;          // Cooldown.
-        public float castTime = 0.3f;        // Tempo de conjuração.
-        public int damage = 10;              // Dano causado.
-        public int manaCost = 0;             // Custo de mana (opcional).
+        public float range = 1.7f;
+        public float cooldown = 2f;
+        public float castTime = 0.3f;
+        public int damage = 10;
+        public int manaCost = 0;
 
-        [HideInInspector] public float lastUseTime = -999f; // Última vez que foi usada.
+        [NonSerialized] public float lastUseTime = -999f;
     }
 
-    // Controle de auto-ataque
-    private bool isAutoAttacking = false;
-    private Coroutine autoAttackRoutine = null;
-
-
     [Header("Skills")]
-    [SerializeField] private SkillSlot basicAttack;     // Skill usada no duplo clique.
+    [SerializeField] private SkillSlot basicAttack;
     [SerializeField] private SkillSlot[] skills;        // Skills extras (F1, F2...).
 
-    private bool isCasting = false;                    // Está conjurando alguma coisa?
-    private SkillSlot pendingSkill = null;             // Skill que está esperando entrar em alcance.
-    private ITargetable pendingSkillTarget = null;     // Alvo da skill pendente.
+    private bool isCasting = false;                     // Trava durante cast
+    private bool isAutoAttacking = false;
+    private Coroutine autoAttackRoutine;
+
+    private SkillSlot pendingSkill = null;              // Skill que será usada quando chegar no alvo
+    private ITargetable pendingSkillTarget = null;      // Alvo pendente (para auto-approach)
 
     //==========================================================
     //  VIDA / MANA / XP
     //==========================================================
 
     [Header("Vida & Dano")]
-    [SerializeField] private int maxHealth = 100;       // Vida máxima do player.
-    [SerializeField] private int currentHealth;                          // Vida atual.
+    [SerializeField] private int maxHealth = 100;
+    private int currentHealth;
 
     [Header("Mana")]
-    [SerializeField] private int maxMana = 50;
+    [SerializeField] private int maxMana = 100;
     private int currentMana;
 
-    [Header("Experiência / Level")]
+    [Header("XP / Level")]
     [SerializeField] private int level = 1;
-    [SerializeField] private int baseXPToNextLevel = 50;
-    [SerializeField] private float xpGrowthFactor = 1.5f;
-
+    [SerializeField] private int xpToNextLevel = 50;
     private int currentXP;
-    private int xpToNextLevel;
 
+    public int Level => level;
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
     public int CurrentMana => currentMana;
     public int MaxMana => maxMana;
     public int CurrentXP => currentXP;
     public int XPToNextLevel => xpToNextLevel;
-    public int Level => level;
+
+    public event Action<int, int> OnHealthChanged;
+    public event Action<int, int> OnManaChanged;
+    public event Action<int, int> OnXPChanged;
 
     //==========================================================
-    //  EVENTOS PARA HUD
-    //==========================================================
-
-    public event Action<int, int> OnHealthChanged;          // (current, max)
-    public event Action<int, int> OnManaChanged;            // (current, max)
-    public event Action<int, int> OnXPChanged;              // (currentXP, xpToNextLevel)
-    public event Action<int> OnLevelChanged;           // (newLevel)
-
-    //==========================================================
-    //  COMBAT MODE
+    //  COMBAT MODE (tempo desde última ação)
     //==========================================================
 
     [Header("Combat Mode")]
-    [SerializeField] private float combatFadeTime = 5f; // Tempo sem combate p/ sair do modo.
+    [SerializeField] private float combatTimeout = 5f;
 
-    private float lastCombatTime = -999f;               // Último evento de combate.
-    private bool isInCombat = false;                    // Está em modo de combate?
-    private bool isDead = false;                        // Player morreu?
+    private float lastCombatTime = -999f;
 
     //==========================================================
-    //  CICLO DE VIDA
+    //  UNITY LIFECYCLE
     //==========================================================
 
     private void Awake()
     {
-        // Singleton
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-
-        // Garante referências.
         if (rb == null) rb = GetComponent<Rigidbody2D>();
         if (playerAnim == null) playerAnim = GetComponentInChildren<PlayerAnim>();
-        if (enemyHud == null) enemyHud = EnemyHUDController.Instance;
-        if (spriteFlipper == null) spriteFlipper = GetComponentInChildren<SpriteFlipper>();
+        if (spriteFlipper == null) spriteFlipper = GetComponent<SpriteFlipper>();
 
-
-        mainCam = Camera.main;
-
-        // Inicializa recursos
         currentHealth = maxHealth;
         currentMana = maxMana;
+        currentXP = 0;
+    }
 
-        // XP para o nível atual
-        xpToNextLevel = Mathf.RoundToInt(baseXPToNextLevel *
-                                         Mathf.Pow(xpGrowthFactor, level - 1));
-
-        // Dispara eventos iniciais para a HUD do player
+    private void Start()
+    {
         RaiseHealthChanged();
         RaiseManaChanged();
         RaiseXPChanged();
-        OnLevelChanged?.Invoke(level);
     }
 
     private void Update()
     {
-        if (isDead) return;
+        // Ignora input quando está sobre UI (evita clicar na HUD e andar).
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
 
         HandleMouseInput();
-        HandleKeyboardInput();
+        HandleSkillHotkeys();
+        HandleTargetKeepAlive();
+
         UpdateCombatMode();
-        UpdateAnimation();
     }
 
     private void FixedUpdate()
     {
-        if (isDead) return;
         HandleMovement();
+        UpdateAnimation();
     }
 
     //==========================================================
-    //  INPUT DE MOUSE
+    //  INPUT (Mouse)
     //==========================================================
 
     private void HandleMouseInput()
     {
-        // Evita que cliques em UI sejam processados como movimento.
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-            return;
-
         if (Input.GetMouseButtonDown(0))
         {
-            Vector3 mouseWorldPos = mainCam.ScreenToWorldPoint(Input.mousePosition);
-            mouseWorldPos.z = 0f;
-
-            // 1) Tentamos clicar em um inimigo.
-            Collider2D enemyCol = Physics2D.OverlapPoint(mouseWorldPos, enemyMask);
-
-            if (enemyCol != null)
-            {
-                ITargetable target = enemyCol.GetComponent<ITargetable>();
-                if (target != null)
-                {
-                    HandleClickOnEnemy(target);
-                    return;
-                }
-            }
-
-            // 2) Se não clicou em inimigo, tratamos como chão.
-            Collider2D groundCol = Physics2D.OverlapPoint(mouseWorldPos, groundMask);
-
-            if (groundCol != null)
-            {
-                moveDestination = mouseWorldPos;
-                isAutoMoving = true;
-
-                // Não limpamos o target (comportamento Lineage-like).
-                pendingSkill = null;
-                pendingSkillTarget = null;
-            }
-        }
-    }
-
-    private void HandleClickOnEnemy(ITargetable target)
-    {
-        float now = Time.time;
-
-        bool isDoubleClick =
-            (target == lastClickedTarget) &&
-            (now - lastClickTime <= doubleClickThreshold);
-
-        lastClickTime = now;
-        lastClickedTarget = target;
-
-        if (TargetManager.Instance != null)
-            TargetManager.Instance.SetTarget(target);
-
-        if (isDoubleClick)
-        {
-            StopBasicAttack(); // sempre reinicia o loop
-            autoAttackRoutine = StartCoroutine(BasicAttackLoop(target));
-        }
-    }
-
-    //==========================================================
-    //  INPUT DE TECLADO
-    //==========================================================
-
-    private void HandleKeyboardInput()
-    {
-        // TAB: ciclo entre alvos.
-        if (Input.GetKeyDown(KeyCode.Tab) && TargetManager.Instance != null)
-        {
-            TargetManager.Instance.CycleTargetWithTab(transform.position, tabSearchRadius);
-        }
-
-        if (Input.GetKeyDown(basicAttack.key))
-        {
-            ITargetable t = TargetManager.Instance?.CurrentTarget;
-
-            if (t != null && t.IsAlive)
-            {
-                StopBasicAttack();
-                autoAttackRoutine = StartCoroutine(BasicAttackLoop(t));
-            }
-        }
-
-        // --------------------------------------------------
-        //  ATAQUE BÁSICO PELO TECLADO (ex: F1)
-        // --------------------------------------------------
-        if (Input.GetKeyDown(basicAttack.key))
-        {
-            ITargetable currentTarget = TargetManager.Instance != null
-                ? TargetManager.Instance.CurrentTarget
+            // Clique em inimigo?
+            ITargetable clicked = TargetManager.Instance != null
+                ? TargetManager.Instance.GetTargetUnderMouse(enemyMask)
                 : null;
 
-            if (currentTarget != null && currentTarget.IsAlive)
+            // Double click → auto attack
+            bool isDoubleClick = false;
+
+            float now = Time.time;
+            if (clicked != null && clicked == lastClickedTarget && (now - lastClickTime) <= doubleClickThreshold)
+                isDoubleClick = true;
+
+            lastClickTime = now;
+            lastClickedTarget = clicked;
+
+            if (clicked != null)
             {
-                TryUseSkillOnTarget(basicAttack, currentTarget);
+                if (TargetManager.Instance != null)
+                    TargetManager.Instance.SetTarget(clicked);
+
+                if (isDoubleClick)
+                {
+                    StopBasicAttack(); // sempre reinicia o loop
+                    autoAttackRoutine = StartCoroutine(BasicAttackLoop(clicked));
+                }
             }
+            else
+            {
+                // Clique no chão: cancela auto attack e move.
+                StopBasicAttack();
+                pendingSkill = null;
+                pendingSkillTarget = null;
+
+                Vector2 world = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                MoveTo(world);
+            }
+        }
+
+        // TAB: troca target
+        if (Input.GetKeyDown(KeyCode.Tab))
+            SearchNextTarget();
+    }
+
+    //==========================================================
+    //  INPUT (Skills)
+    //==========================================================
+
+    private void HandleSkillHotkeys()
+    {
+        // Ataque básico pelo slot (F1), se quiser:
+        if (basicAttack != null && Input.GetKeyDown(basicAttack.key))
+        {
+            TryUseSkillOnTarget(basicAttack);
+            return;
         }
 
         // Skills adicionais (F1/F2/F3...).
         if (skills != null)
         {
-            foreach (var slot in skills)
+            foreach (var s in skills)
             {
-                if (Input.GetKeyDown(slot.key))
+                if (s != null && Input.GetKeyDown(s.key))
                 {
-                    ITargetable currentTarget = TargetManager.Instance != null
-                        ? TargetManager.Instance.CurrentTarget
-                        : null;
-
-                    if (currentTarget != null && currentTarget.IsAlive)
-                    {
-                        TryUseSkillOnTarget(slot, currentTarget);
-                    }
+                    TryUseSkillOnTarget(s);
+                    return;
                 }
             }
         }
     }
 
-    //==========================================================
-    //  SKILLS / AUTO-APPROACH
-    //==========================================================
-
-    private void TryUseSkillOnTarget(SkillSlot slot, ITargetable target)
+    private void TryUseSkillOnTarget(SkillSlot slot)
     {
-        if (slot == null || target == null) return;
+        if (slot == null) return;
+        if (isCasting) return;
 
-        // Cooldown
-        if (Time.time < slot.lastUseTime + slot.cooldown)
+        // Cooldown check
+        if (Time.time - slot.lastUseTime < slot.cooldown)
             return;
 
-        // Mana
-        if (!TryConsumeMana(slot.manaCost))
+        ITargetable target = TargetManager.Instance != null ? TargetManager.Instance.CurrentTarget : null;
+        if (target == null || !target.IsAlive)
             return;
 
-        // Define como skill pendente
-        pendingSkill = slot;
-        pendingSkillTarget = target;
+        // Mana check
+        if (currentMana < slot.manaCost)
+            return;
 
         float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
 
-        if (dist > slot.range)
+        // 🔥 Importante: já vira pro alvo aqui (primeira garantia).
+        // Porém, sozinha ela NÃO basta, porque o player pode chegar no alvo
+        // e iniciar o cast com facing desatualizado (por isso reforçamos depois).
+        FaceTarget(target.TargetTransform.position);
+
+        // Se está no alcance → cast agora
+        if (dist <= slot.range)
         {
-            // Fora do alcance → andar até aproximar.
-            moveDestination = target.TargetTransform.position;
-            isAutoMoving = true;
+            ConsumeMana(slot.manaCost);
+            StartCoroutine(CastAndExecuteSkill(slot, target));
         }
         else
         {
-            // Já está em alcance → executa agora.
-            StartCoroutine(CastAndExecuteSkill(slot, target));
+            // Se não está no alcance → aproxima e guarda a intenção (auto-approach)
+            pendingSkill = slot;
+            pendingSkillTarget = target;
+
+            MoveTo(target.TargetTransform.position);
         }
     }
+
+    //==========================================================
+    //  CAST / EXECUÇÃO (DANO)
+    //==========================================================
 
     private IEnumerator CastAndExecuteSkill(SkillSlot slot, ITargetable target)
     {
@@ -371,11 +307,14 @@ public class Player : MonoBehaviour
 
         RegisterCombatEvent();
 
+        // Para tudo: aqui começa a liturgia do cast.
         isAutoMoving = false;
         moveDestination = null;
         rb.linearVelocity = Vector2.zero;
 
-        // Olha para o alvo.
+        // 🧭 Bússola arcana do Stark: "se vou disparar algo, eu olho pro alvo".
+        // Aqui a orientação NÃO é estética: ela influencia o SpriteFlipper e o alinhamento do MagicPointAttack.
+        // Em outras palavras: o facing certo aqui evita fireball nascendo no lado errado.
         FaceTarget(target.TargetTransform.position);
 
         // Liga flag de cast no Animator.
@@ -387,6 +326,14 @@ public class Player : MonoBehaviour
 
         // Espera o tempo de cast.
         yield return new WaitForSeconds(slot.castTime);
+
+        // ⚡ Reforço de orientação (por que isso existe?):
+        // - Durante o cast, o alvo pode se mover.
+        // - O player pode ter recebido uma atualização de facing por outros sistemas.
+        // - E principalmente: seu spawnpoint (MagicPointAttack) depende do facing.
+        // Então, imediatamente antes de executar o efeito (dano / projétil), a gente "re-trava" o olhar no alvo.
+        if (target != null)
+            FaceTarget(target.TargetTransform.position);
 
         // Aplica dano se o alvo ainda está vivo.
         if (target != null && target.IsAlive)
@@ -402,9 +349,11 @@ public class Player : MonoBehaviour
             }
         }
 
+        // Desliga cast no Animator.
         playerAnim.SetCasting(false);
         isCasting = false;
 
+        // Se essa skill era pendente, limpa.
         if (pendingSkill == slot)
         {
             pendingSkill = null;
@@ -452,6 +401,11 @@ public class Player : MonoBehaviour
 
                 if (distToTarget <= pendingSkill.range)
                 {
+                    // 🔥 Momento Tony Stark: antes de conjurar, garante que o mago está olhando pro alvo.
+                    // Isso é vital porque o SpriteFlipper ajusta o visual *e* o MagicPointAttack (spawnpoint).
+                    // Se a orientação estiver errada, o projétil nasce no "lado espelhado" (principalmente com padding).
+                    FaceTargetTransform(pendingSkillTarget.TargetTransform);
+
                     StartCoroutine(CastAndExecuteSkill(pendingSkill, pendingSkillTarget));
                 }
             }
@@ -465,16 +419,37 @@ public class Player : MonoBehaviour
         FaceTarget(dest);
     }
 
+    public void MoveTo(Vector2 destination)
+    {
+        isAutoMoving = true;
+        moveDestination = destination;
+    }
+
     //==========================================================
     //  ORIENTAÇÃO VISUAL (SEM MEXER NO TRANSFORM)
     //==========================================================
 
+    /// <summary>
+    /// Vira o player para olhar para uma posição no mundo.
+    /// IMPORTANTÍSSIMO: aqui não mexemos em scale/transform do Player.
+    /// O flip é responsabilidade do SpriteFlipper (SpriteRenderer.flipX).
+    /// </summary>
     private void FaceTarget(Vector3 worldPos)
     {
-        if (spriteFlipper == null) return;
-
         float dirX = worldPos.x - transform.position.x;
-        spriteFlipper.FaceDirection(dirX);
+
+        if (spriteFlipper != null)
+            spriteFlipper.FaceDirection(dirX);
+    }
+
+    /// <summary>
+    /// “Versão segura” pra mirar em Transform (alvo),
+    /// reaproveitando o método oficial FaceTarget.
+    /// </summary>
+    private void FaceTargetTransform(Transform target)
+    {
+        if (target == null) return;
+        FaceTarget(target.position); // reaproveita seu método oficial (SpriteFlipper)
     }
 
     private void UpdateAnimation()
@@ -484,46 +459,49 @@ public class Player : MonoBehaviour
     }
 
     //==========================================================
-    //  COMBAT MODE & DANO RECEBIDO
+    //  COMBAT MODE & TARGET KEEP ALIVE
     //==========================================================
 
     private void RegisterCombatEvent()
     {
         lastCombatTime = Time.time;
-
-        if (!isInCombat)
-        {
-            isInCombat = true;
-            playerAnim.SetInCombat(true);
-            // Aqui dá para acender o ícone de "espadas" na HUD do player, se quiser.
-        }
     }
 
     private void UpdateCombatMode()
     {
-        if (isInCombat && Time.time > lastCombatTime + combatFadeTime)
+        bool inCombat = (Time.time - lastCombatTime) <= combatTimeout;
+
+        if (enemyHud != null)
+            enemyHud.SetOrbsInCombat(inCombat);
+    }
+
+    private void HandleTargetKeepAlive()
+    {
+        if (TargetManager.Instance == null) return;
+
+        ITargetable target = TargetManager.Instance.CurrentTarget;
+        if (target == null) return;
+
+        float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
+        if (dist > maxTargetDistanceToKeep)
         {
-            isInCombat = false;
-            playerAnim.SetInCombat(false);
-
-            if (enemyHud != null)
-                enemyHud.SetOrbsInCombat(false);
-        }
-
-        if (TargetManager.Instance != null)
-        {
-            ITargetable currentTarget = TargetManager.Instance.CurrentTarget;
-            if (currentTarget != null)
-            {
-                float dist = Vector3.Distance(
-                    transform.position,
-                    currentTarget.TargetTransform.position);
-
-                if (dist > maxTargetDistanceToKeep)
-                    TargetManager.Instance.ClearTarget();
-            }
+            TargetManager.Instance.ClearTarget();
+            StopBasicAttack();
         }
     }
+
+    private void SearchNextTarget()
+    {
+        if (TargetManager.Instance == null) return;
+
+        ITargetable next = TargetManager.Instance.FindNearestTarget(enemyMask, tabSearchRadius);
+        if (next != null)
+            TargetManager.Instance.SetTarget(next);
+    }
+
+    //==========================================================
+    //  ATAQUE BÁSICO (DOUBLE CLICK)
+    //==========================================================
 
     private IEnumerator BasicAttackLoop(ITargetable target)
     {
@@ -543,8 +521,7 @@ public class Player : MonoBehaviour
             // Se está longe demais → aproximar
             if (dist > basicAttack.range)
             {
-                moveDestination = target.TargetTransform.position;
-                isAutoMoving = true;
+                MoveTo(target.TargetTransform.position);
             }
             else
             {
@@ -559,7 +536,6 @@ public class Player : MonoBehaviour
         }
     }
 
-
     public void StopBasicAttack()
     {
         isAutoAttacking = false;
@@ -571,46 +547,14 @@ public class Player : MonoBehaviour
         }
     }
 
-
-
-    /// <summary>Receber dano.</summary>
-    public void TakeDamage(int amount)
-    {
-        amount = Mathf.Max(0, amount);
-        currentHealth -= amount;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-
-        RegisterCombatEvent();
-        RaiseHealthChanged();
-
-        if (currentHealth <= 0)
-            Die();
-    }
-
-    private void Die()
-    {
-        isAutoMoving = false;
-        pendingSkill = null;
-        pendingSkillTarget = null;
-        rb.linearVelocity = Vector2.zero;
-
-        isDead = true;
-
-        playerAnim.PlayDeath();
-        Debug.Log("PLAYER MORREU");
-    }
-
     //==========================================================
-    //  MANA / XP
+    //  MANA
     //==========================================================
 
-    /// <summary>Tenta consumir mana. Retorna true se conseguiu.</summary>
-    public bool TryConsumeMana(int amount)
+    private bool ConsumeMana(int amount)
     {
         if (amount <= 0) return true;
-
-        if (currentMana < amount)
-            return false;
+        if (currentMana < amount) return false;
 
         currentMana -= amount;
         currentMana = Mathf.Clamp(currentMana, 0, maxMana);
@@ -627,35 +571,59 @@ public class Player : MonoBehaviour
         RaiseManaChanged();
     }
 
-    /// <summary>Ganha experiência (usado pelos inimigos ao morrer).</summary>
-    public void GainXP(int amount)
+    //==========================================================
+    //  VIDA / DANO / XP
+    //==========================================================
+
+    /// <summary>Receber dano.</summary>
+    public void TakeDamage(int amount)
     {
-        if (amount <= 0 || isDead) return;
+        amount = Mathf.Max(0, amount);
+        currentHealth -= amount;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        RegisterCombatEvent();
+        RaiseHealthChanged();
+
+        if (currentHealth <= 0)
+        {
+            // Morte (você pode expandir isso depois).
+            playerAnim.PlayDeath();
+        }
+    }
+
+    public void AddXP(int amount)
+    {
+        if (amount <= 0) return;
 
         currentXP += amount;
-
-        bool leveledUp = false;
 
         while (currentXP >= xpToNextLevel)
         {
             currentXP -= xpToNextLevel;
-            level++;
-            leveledUp = true;
-
-            xpToNextLevel = Mathf.RoundToInt(baseXPToNextLevel *
-                                             Mathf.Pow(xpGrowthFactor, level - 1));
+            LevelUp();
         }
 
         RaiseXPChanged();
+    }
 
-        if (leveledUp)
-        {
-            OnLevelChanged?.Invoke(level);
-        }
+    private void LevelUp()
+    {
+        level++;
+
+        // Exemplo simples de progressão:
+        xpToNextLevel = Mathf.RoundToInt(xpToNextLevel * 1.2f);
+
+        // Recupera um pouco ao upar (opcional)
+        currentHealth = maxHealth;
+        currentMana = maxMana;
+
+        RaiseHealthChanged();
+        RaiseManaChanged();
     }
 
     //==========================================================
-    //  HELPERS DE EVENTO
+    //  HUD EVENTS
     //==========================================================
 
     private void RaiseHealthChanged()
