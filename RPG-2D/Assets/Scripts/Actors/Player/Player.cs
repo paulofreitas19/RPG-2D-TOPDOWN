@@ -147,6 +147,55 @@ public class Player : MonoBehaviour
     private float lastCombatTime = -999f;
 
     //==========================================================
+    //  SELO DE CONTROLE EXTERNO (Approach Lock)
+    //==========================================================
+
+    // 🔒 Este selo é usado por sistemas externos (ex: SkillCaster)
+    // para bloquear INPUT do Player durante uma aproximação automática
+    // (auto-approach), sem travar o movimento em si.
+    //
+    // Por que ele existe?
+    // - O hard lock (isCasting) trava movimento, então não serve para 'andar até o alvo'.
+    // - Durante o approach, queremos impedir: clique no chão, TAB, hotkeys, spam.
+    // - Mas queremos permitir que um sistema externo continue chamando MoveTo() até entrar no range.
+    //
+    // Resultado:
+    // - Player não obedece input do jogador durante approach
+    // - mas continua se movendo automaticamente até o ponto desejado.
+    private bool externalInputLock = false;
+
+    /// <summary>
+    /// True quando um sistema externo bloqueou o input do Player (approach).
+    /// </summary>
+    public bool IsExternallyInputLocked => externalInputLock;
+
+    /// <summary>
+    /// 🔒 Ativa o bloqueio de input externo (aproximação).
+    /// Não trava o movimento automático; apenas impede o jogador de sobrescrever
+    /// a intenção atual com cliques/hotkeys/TAB.
+    /// </summary>
+    public void BeginExternalInputLock()
+    {
+        if (externalInputLock) return;
+        externalInputLock = true;
+
+        // Coerência: durante um approach externo, não faz sentido manter
+        // auto-attack interno ou pendências internas de skill rodando.
+        StopBasicAttack();
+        pendingSkill = null;
+        pendingSkillTarget = null;
+    }
+
+    /// <summary>
+    /// 🔓 Desativa o bloqueio de input externo (fim da aproximação).
+    /// </summary>
+    public void EndExternalInputLock()
+    {
+        if (!externalInputLock) return;
+        externalInputLock = false;
+    }
+
+    //==========================================================
     //  UNITY LIFECYCLE
     //==========================================================
 
@@ -295,6 +344,12 @@ public class Player : MonoBehaviour
 
     private void HandleMouseInput()
     {
+        // 🔒 Selo de Controle Externo (Approach Lock):
+        // Durante aproximação automática iniciada por sistemas externos (SkillCaster),
+        // ignoramos inputs do jogador (clique, TAB, hotkeys) para não quebrar o fluxo.
+        if (externalInputLock)
+            return;
+
         // 🔒 Selo do Movimento:
         // Enquanto castando, ignoramos clique no chão para mover.
         // (Mas ainda permitimos clicar em inimigo para targetar se você quiser.)
@@ -367,6 +422,12 @@ public class Player : MonoBehaviour
 
     private void HandleSkillHotkeys()
     {
+        // 🔒 Selo de Controle Externo (Approach Lock):
+        // Durante aproximação automática iniciada por sistemas externos (SkillCaster),
+        // ignoramos hotkeys para não permitir spam/override de intenção.
+        if (externalInputLock)
+            return;
+
         // 🔒 Selo da Conjuração (anti-spam):
         // Enquanto castando, ignoramos hotkeys de skills.
         if (isCasting)

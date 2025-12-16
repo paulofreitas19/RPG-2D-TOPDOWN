@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FireBallSkill
   skillName: FireBall
   castTime: 1.2
+  targetType: 0
+  castRange: 10
   skillPrefab: {fileID: 9143907712053440600, guid: c8afb65e9b5d37243ba2b3bd54c15d30, type: 3}
   icon: {fileID: 1783882552325120560, guid: 0c922c5e84ac0c04387c3a9d34dc6fc1, type: 3}
   speed: 22
