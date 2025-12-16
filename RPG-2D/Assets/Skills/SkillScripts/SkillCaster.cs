@@ -10,6 +10,9 @@ public class SkillCaster : MonoBehaviour
     // Então precisamos buscá-lo nos filhos (senão ele vira null e nada vira).
     private SpriteFlipper spriteFlipper;
 
+    // 🔒 Referência ao Player para travar/destravar input/movimento durante cast
+    private Player player;
+
     [SerializeField] private Transform magicAttackPoint;
     public Transform MagicAttackPoint => magicAttackPoint;
 
@@ -20,62 +23,52 @@ public class SkillCaster : MonoBehaviour
 
         // ✨ Runa do acerto: o SpriteFlipper está no filho "Sprite"
         spriteFlipper = GetComponentInChildren<SpriteFlipper>(true);
+
+        // 🔒 Player está no objeto raiz (mesmo GO do SkillCaster)
+        player = GetComponent<Player>();
     }
 
     public void CastSkill(SkillBase skill, Transform target)
     {
+        // 🔒 Anti-spam: se o Player já está castando, não inicia outro cast.
+        if (player != null && player.IsCasting)
+            return;
+
         StartCoroutine(Cast(skill, target));
     }
 
     private IEnumerator Cast(SkillBase skill, Transform target)
     {
-        // 🧭 ─────────────────────────────────────────────
-        // FASE 0 — ALINHAMENTO ARCANO DO CAST
-        // Antes de conjurar qualquer magia:
-        // o mago DEVE olhar para o alvo.
-        //
-        // Aqui evitamos chamar FaceTarget(...) porque sua assinatura pode variar.
-        // Usamos FaceDirection(dirX), que é a runa mais robusta:
-        // - Se alvo está à direita => dirX > 0 => vira para direita
-        // - Se alvo está à esquerda => dirX < 0 => vira para esquerda
-        // ─────────────────────────────────────────────
+        // 🔒 Ativa hard lock no Player
+        if (player != null)
+            player.BeginExternalCastLock();
+
+        // 🧭 Alinha visual antes do cast
         FaceTargetSafely(target);
 
-        // 🟣 ─────────────────────────────────────────────
-        // FASE 1 — CONJURAÇÃO (CAST)
-        // O mago canaliza energia enquanto a magia
-        // permanece presa à sua mão.
-        // ─────────────────────────────────────────────
+        // 🔮 Conjuração
         playerAnim.SetCasting(true);
-
-        // Começa animação do player
         animator.SetTrigger("idleCast");
 
-        // ✅ Garantia extra:
-        // imediatamente antes de preparar (spawn do preview), garante que já está virado.
         FaceTargetSafely(target);
 
-        // 🔮 Prepara a skill (instancia e gruda na mão)
+        // Prepara a skill (fica na mão)
         skill.Prepare(gameObject, target);
 
         yield return new WaitForSeconds(skill.castTime);
 
-        // 🔥 ─────────────────────────────────────────────
-        // FASE 2 — DISPARO (SHOOT)
-        // A magia é liberada ao mundo físico.
-        // ─────────────────────────────────────────────
-        // ✅ Garantia extra:
-        // imediatamente antes de disparar, garante que ainda está virado pro alvo.
+        // 🔥 Disparo
         FaceTargetSafely(target);
-
         skill.Activate(gameObject, target);
 
-        // ⚔️ Animação de ataque básico
         playerAnim.PlayBasicAttack();
-
-        // 🟢 Finaliza o estado de cast
         playerAnim.SetCasting(false);
+
+        // 🔓 Libera hard lock
+        if (player != null)
+            player.EndExternalCastLock();
     }
+
 
     /// <summary>
     /// 🧿 Feitiço utilitário ultra-resistente:

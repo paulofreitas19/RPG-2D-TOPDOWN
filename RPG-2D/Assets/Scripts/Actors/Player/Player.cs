@@ -31,7 +31,6 @@ public class Player : MonoBehaviour
     // e opcionalmente reposicionar o MagicPointAttack (spawnpoint).
     [SerializeField] private SpriteFlipper spriteFlipper; // Guardião do flip (SpriteRenderer + MagicPointAttack)
 
-
     //==========================================================
     //  IDENTIFICAÇÃO
     //==========================================================
@@ -125,6 +124,15 @@ public class Player : MonoBehaviour
     public int CurrentXP => currentXP;
     public int XPToNextLevel => xpToNextLevel;
 
+    // 🔒 Estado sagrado do cast
+    // ------------------------------------------------------------------
+    // Importante:
+    // - Você já tinha a flag "isCasting" usada no fluxo inteiro do Player.
+    // - Para manter compatibilidade e evitar quebrar o mundo,
+    //   a propriedade pública IsCasting apenas reflete o isCasting.
+    // ------------------------------------------------------------------
+    public bool IsCasting => isCasting;
+
     public event Action<int, int> OnHealthChanged;
     public event Action<int, int> OnManaChanged;
     public event Action<int, int> OnXPChanged;
@@ -195,11 +203,112 @@ public class Player : MonoBehaviour
     }
 
     //==========================================================
+    //  HARD LOCK (Cast Lock)
+    //==========================================================
+
+    /// <summary>
+    /// 🔒 RUNA DO SELAMENTO ARCANO (Hard Lock)
+    /// ----------------------------------------------------------
+    /// Durante o cast queremos bloquear:
+    /// - Movimento por clique (click-to-move)
+    /// - Iniciar outra skill (anti-spam)
+    /// - Mudanças de direção por movimento (facing lock indireto)
+    ///
+    /// Observação:
+    /// A direção para o alvo ainda é permitida no instante certo,
+    /// pois ela ocorre via FaceTarget() dentro do próprio cast.
+    /// </summary>
+    private void LockCasting()
+    {
+        isCasting = true;
+
+        // 👣 Selo do Movimento:
+        // Ao iniciar cast, paramos completamente e limpamos destino.
+        // Assim, nenhum "clique anterior" continua puxando o player.
+        isAutoMoving = false;
+        moveDestination = null;
+        rb.linearVelocity = Vector2.zero;
+
+        // Opcional, mas coerente com o combate:
+        // durante cast não faz sentido manter auto-attack rodando.
+        StopBasicAttack();
+    }
+
+    /// <summary>
+    /// 🔓 RUNA DA LIBERTAÇÃO (fim do cast)
+    /// ----------------------------------------------------------
+    /// Ao terminar o cast, o Player volta a obedecer:
+    /// - clique no chão para mover
+    /// - hotkeys para conjurar outras skills
+    /// </summary>
+    private void UnlockCasting()
+    {
+        isCasting = false;
+    }
+
+    //==========================================================
+    //  CAST EXTERNO (SkillCaster)
+    //==========================================================
+
+    /// <summary>
+    /// 🧿 PORTAL ARCANO — INÍCIO DE CAST EXTERNO
+    /// ----------------------------------------------------------
+    /// Usado por sistemas externos (ex: SkillCaster)
+    /// para informar ao Player:
+    /// "Você está conjurando uma magia agora".
+    ///
+    /// Internamente, isso ativa os mesmos selos usados
+    /// pelo cast interno do Player:
+    /// - bloqueia movimento
+    /// - bloqueia input
+    /// - bloqueia spam de skills
+    ///
+    /// Importante:
+    /// - Não expõe flags
+    /// - Não permite estados inválidos
+    /// - Apenas delega para LockCasting()
+    /// </summary>
+    public void BeginExternalCastLock()
+    {
+        if (isCasting) return;
+        LockCasting();
+    }
+
+    /// <summary>
+    /// ✨ PORTAL ARCANO — FIM DE CAST EXTERNO
+    /// ----------------------------------------------------------
+    /// Libera o Player após o término do cast iniciado
+    /// por sistemas externos (SkillCaster).
+    ///
+    /// Quebra os mesmos selos ativados no BeginExternalCastLock().
+    /// </summary>
+    public void EndExternalCastLock()
+    {
+        if (!isCasting) return;
+        UnlockCasting();
+    }
+
+
+    //==========================================================
     //  INPUT (Mouse)
     //==========================================================
 
     private void HandleMouseInput()
     {
+        // 🔒 Selo do Movimento:
+        // Enquanto castando, ignoramos clique no chão para mover.
+        // (Mas ainda permitimos clicar em inimigo para targetar se você quiser.)
+        if (isCasting)
+        {
+            // TAB também não deve trocar alvo durante cast (evita mudanças de intenção no meio da conjuração)
+            if (Input.GetKeyDown(KeyCode.Tab))
+                return;
+
+            // Clique no chão durante cast não deve fazer nada:
+            // ignoramos apenas a parte de "mover".
+            // Ainda assim, deixamos o clique em inimigo funcionar (target apenas), caso você goste desse comportamento.
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
             // Clique em inimigo?
@@ -223,7 +332,8 @@ public class Player : MonoBehaviour
                 if (TargetManager.Instance != null)
                     TargetManager.Instance.SetTarget(clicked);
 
-                if (isDoubleClick)
+                // 🔒 Durante cast, não iniciamos auto-attack (senão vira “spam de loop”).
+                if (!isCasting && isDoubleClick)
                 {
                     StopBasicAttack(); // sempre reinicia o loop
                     autoAttackRoutine = StartCoroutine(BasicAttackLoop(clicked));
@@ -232,6 +342,10 @@ public class Player : MonoBehaviour
             else
             {
                 // Clique no chão: cancela auto attack e move.
+                // 🔒 Mas durante cast, NÃO move.
+                if (isCasting)
+                    return;
+
                 StopBasicAttack();
                 pendingSkill = null;
                 pendingSkillTarget = null;
@@ -242,7 +356,8 @@ public class Player : MonoBehaviour
         }
 
         // TAB: troca target
-        if (Input.GetKeyDown(KeyCode.Tab))
+        // 🔒 Bloqueado durante cast (evita o player “pensar em outro inimigo” no meio da conjuração)
+        if (!isCasting && Input.GetKeyDown(KeyCode.Tab))
             SearchNextTarget();
     }
 
@@ -252,6 +367,11 @@ public class Player : MonoBehaviour
 
     private void HandleSkillHotkeys()
     {
+        // 🔒 Selo da Conjuração (anti-spam):
+        // Enquanto castando, ignoramos hotkeys de skills.
+        if (isCasting)
+            return;
+
         // Ataque básico pelo slot (F1), se quiser:
         if (basicAttack != null && Input.GetKeyDown(basicAttack.key))
         {
@@ -276,6 +396,9 @@ public class Player : MonoBehaviour
     private void TryUseSkillOnTarget(SkillSlot slot)
     {
         if (slot == null) return;
+
+        // 🔒 Anti-spam / hard lock:
+        // Não permite iniciar outra skill se já está em cast.
         if (isCasting) return;
 
         // Cooldown check
@@ -319,18 +442,21 @@ public class Player : MonoBehaviour
 
     private IEnumerator CastAndExecuteSkill(SkillSlot slot, ITargetable target)
     {
+        // Se já estiver castando, não entra (anti-spam).
         if (isCasting) yield break;
 
+        // 🔒 Ativa os 3 selos:
+        // - trava movimento
+        // - trava iniciar outra skill
+        // - estabiliza o estado para o cast
+        LockCasting();
+
+        // Por segurança, olha pro alvo no instante do início.
         FaceTarget(target.TargetTransform.position);
-        isCasting = true;
+
         slot.lastUseTime = Time.time;
 
         RegisterCombatEvent();
-
-        // Para tudo: aqui começa a liturgia do cast.
-        isAutoMoving = false;
-        moveDestination = null;
-        rb.linearVelocity = Vector2.zero;
 
         // 🔥 SEGUNDA RUNA: antes de qualquer animação / espera,
         // garantimos a orientação correta.
@@ -370,7 +496,9 @@ public class Player : MonoBehaviour
 
         // Desliga cast no Animator.
         playerAnim.SetCasting(false);
-        isCasting = false;
+
+        // 🔓 Quebra os selos no final do cast:
+        UnlockCasting();
 
         // Se essa skill era pendente, limpa.
         if (pendingSkill == slot)
@@ -386,7 +514,15 @@ public class Player : MonoBehaviour
 
     private void HandleMovement()
     {
-        if (!isAutoMoving || isCasting)
+        // 🔒 Selo do Movimento:
+        // Durante cast, o player NÃO se move.
+        if (isCasting)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
+        if (!isAutoMoving)
         {
             rb.linearVelocity = Vector2.zero;
             return;
@@ -445,6 +581,11 @@ public class Player : MonoBehaviour
 
     public void MoveTo(Vector2 destination)
     {
+        // 🔒 Selo do Movimento:
+        // Se está castando, ignora o comando de movimento.
+        if (isCasting)
+            return;
+
         isAutoMoving = true;
         moveDestination = destination;
     }
@@ -648,7 +789,6 @@ public class Player : MonoBehaviour
         AddXP(amount);
     }
 
-
     private void LevelUp()
     {
         level++;
@@ -709,6 +849,4 @@ public class Player : MonoBehaviour
     // Removê-la quebra o contrato arcano do sistema.
     // ==========================================================
     public event Action<int> OnLevelChanged;
-
-
 }
