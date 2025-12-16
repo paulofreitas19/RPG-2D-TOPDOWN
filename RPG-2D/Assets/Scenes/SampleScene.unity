@@ -403,11 +403,11 @@ Transform:
   m_GameObject: {fileID: 205365766}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.43, y: 1.94, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 2.7560978, y: 4.317074, z: 0}
+  m_LocalScale: {x: 2.4390244, y: 2.4390244, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1068883255}
+  m_Father: {fileID: 1483056670}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &320131381
 GameObject:
@@ -2401,7 +2401,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1483056670}
-  - {fileID: 205365767}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1068883256
@@ -2423,9 +2422,6 @@ MonoBehaviour:
   displayName: Merlin
   moveSpeed: 3
   stoppingDistance: 0.1
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 256
   enemyMask:
     serializedVersion: 2
     m_Bits: 128
@@ -2440,15 +2436,12 @@ MonoBehaviour:
     castTime: 0.3
     damage: 10
     manaCost: 0
-    lastUseTime: -999
   skills: []
   maxHealth: 100
-  currentHealth: 0
   maxMana: 50
   level: 1
-  baseXPToNextLevel: 50
-  xpGrowthFactor: 1.5
-  combatFadeTime: 5
+  xpToNextLevel: 50
+  combatTimeout: 5
 --- !u!114 &1068883257
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3092,7 +3085,8 @@ Transform:
   m_LocalPosition: {x: 0.2999997, y: 0.16999984, z: -0.07384741}
   m_LocalScale: {x: 0.41, y: 0.41, z: 0}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 205365767}
   m_Father: {fileID: 1068883255}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1483056671
@@ -3122,7 +3116,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpriteFlipper
   spriteRenderer: {fileID: 1483056669}
   magicPointAttack: {fileID: 205365767}
-  magicPointFlipOffsetX: -2.28
+  spriteFacesLeftByDefault: 1
+  extraOffsetRightX: 0
+  extraOffsetLeftX: 0
 --- !u!1 &1492587955
 GameObject:
   m_ObjectHideFlags: 0

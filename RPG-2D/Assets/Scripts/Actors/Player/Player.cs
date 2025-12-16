@@ -15,6 +15,8 @@ using UnityEngine.EventSystems;
 [RequireComponent(typeof(Rigidbody2D))]
 public class Player : MonoBehaviour
 {
+    public static Player Instance { get; private set; }
+
     //==========================================================
     //  REFERENCES (componentes / integrações)
     //==========================================================
@@ -27,7 +29,8 @@ public class Player : MonoBehaviour
     // OBS: SpriteFlipper é o “oráculo” do facing.
     // Ele é o único autorizado a flipar o SpriteRenderer,
     // e opcionalmente reposicionar o MagicPointAttack (spawnpoint).
-    [SerializeField] private SpriteFlipper spriteFlipper;
+    [SerializeField] private SpriteFlipper spriteFlipper; // Guardião do flip (SpriteRenderer + MagicPointAttack)
+
 
     //==========================================================
     //  IDENTIFICAÇÃO
@@ -141,9 +144,24 @@ public class Player : MonoBehaviour
 
     private void Awake()
     {
+        // ===============================
+        // RUNA DO AVATAR ÚNICO (Singleton)
+        // ===============================
+        // Garante que exista apenas um Player
+        // acessível globalmente via Player.Instance
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+
         if (rb == null) rb = GetComponent<Rigidbody2D>();
         if (playerAnim == null) playerAnim = GetComponentInChildren<PlayerAnim>();
-        if (spriteFlipper == null) spriteFlipper = GetComponent<SpriteFlipper>();
+        if (spriteFlipper == null)
+            spriteFlipper = GetComponentInChildren<SpriteFlipper>();
+
 
         currentHealth = maxHealth;
         currentMana = maxMana;
@@ -185,6 +203,7 @@ public class Player : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             // Clique em inimigo?
+            // 🧙‍♂️ Agora esse feitiço realmente existe no TargetManager (e é responsabilidade dele).
             ITargetable clicked = TargetManager.Instance != null
                 ? TargetManager.Instance.GetTargetUnderMouse(enemyMask)
                 : null;
@@ -273,9 +292,9 @@ public class Player : MonoBehaviour
 
         float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
 
-        // 🔥 Importante: já vira pro alvo aqui (primeira garantia).
-        // Porém, sozinha ela NÃO basta, porque o player pode chegar no alvo
-        // e iniciar o cast com facing desatualizado (por isso reforçamos depois).
+        // 🔥 PRIMEIRA RUNA: vira pro alvo IMEDIATAMENTE ao tentar usar.
+        // Mesmo se ainda tiver que andar pra chegar no range, o player já começa
+        // a "se orientar" corretamente.
         FaceTarget(target.TargetTransform.position);
 
         // Se está no alcance → cast agora
@@ -302,6 +321,7 @@ public class Player : MonoBehaviour
     {
         if (isCasting) yield break;
 
+        FaceTarget(target.TargetTransform.position);
         isCasting = true;
         slot.lastUseTime = Time.time;
 
@@ -312,9 +332,8 @@ public class Player : MonoBehaviour
         moveDestination = null;
         rb.linearVelocity = Vector2.zero;
 
-        // 🧭 Bússola arcana do Stark: "se vou disparar algo, eu olho pro alvo".
-        // Aqui a orientação NÃO é estética: ela influencia o SpriteFlipper e o alinhamento do MagicPointAttack.
-        // Em outras palavras: o facing certo aqui evita fireball nascendo no lado errado.
+        // 🔥 SEGUNDA RUNA: antes de qualquer animação / espera,
+        // garantimos a orientação correta.
         FaceTarget(target.TargetTransform.position);
 
         // Liga flag de cast no Animator.
@@ -327,11 +346,11 @@ public class Player : MonoBehaviour
         // Espera o tempo de cast.
         yield return new WaitForSeconds(slot.castTime);
 
-        // ⚡ Reforço de orientação (por que isso existe?):
-        // - Durante o cast, o alvo pode se mover.
-        // - O player pode ter recebido uma atualização de facing por outros sistemas.
-        // - E principalmente: seu spawnpoint (MagicPointAttack) depende do facing.
-        // Então, imediatamente antes de executar o efeito (dano / projétil), a gente "re-trava" o olhar no alvo.
+        // 🔥 TERCEIRA RUNA: imediatamente ANTES de aplicar o efeito,
+        // vira de novo. Por quê?
+        // - o alvo pode ter andado durante o cast
+        // - o facing pode ter sido alterado por movimento / input
+        // - e seu spawnpoint/offset depende do facing (SpriteFlipper)
         if (target != null)
             FaceTarget(target.TargetTransform.position);
 
@@ -401,9 +420,8 @@ public class Player : MonoBehaviour
 
                 if (distToTarget <= pendingSkill.range)
                 {
-                    // 🔥 Momento Tony Stark: antes de conjurar, garante que o mago está olhando pro alvo.
-                    // Isso é vital porque o SpriteFlipper ajusta o visual *e* o MagicPointAttack (spawnpoint).
-                    // Se a orientação estiver errada, o projétil nasce no "lado espelhado" (principalmente com padding).
+                    // 🔥 RUNA FINAL: no exato instante que entra no alcance,
+                    // vira pro alvo ANTES de iniciar o cast.
                     FaceTargetTransform(pendingSkillTarget.TargetTransform);
 
                     StartCoroutine(CastAndExecuteSkill(pendingSkill, pendingSkillTarget));
@@ -416,7 +434,13 @@ public class Player : MonoBehaviour
         Vector2 dirNorm = dir.normalized;
         rb.linearVelocity = dirNorm * moveSpeed;
 
-        FaceTarget(dest);
+        // 🔮 RUNA DO MOVIMENTO CONSCIENTE
+        // Só vira se realmente estiver se movendo no eixo X
+        if (Mathf.Abs(dirNorm.x) > 0.01f)
+        {
+            Vector3 lookPoint = transform.position + new Vector3(dirNorm.x, 0f, 0f);
+            FaceTarget(lookPoint);
+        }
     }
 
     public void MoveTo(Vector2 destination)
@@ -436,11 +460,12 @@ public class Player : MonoBehaviour
     /// </summary>
     private void FaceTarget(Vector3 worldPos)
     {
-        float dirX = worldPos.x - transform.position.x;
-
+        // 🌙 Ao invés de mexer no scale do Player (teleport arcano),
+        // nós pedimos ao SpriteFlipper para virar o visual e o spawnpoint corretamente.
         if (spriteFlipper != null)
-            spriteFlipper.FaceDirection(dirX);
+            spriteFlipper.FaceTarget(worldPos);
     }
+
 
     /// <summary>
     /// “Versão segura” pra mirar em Transform (alvo),
@@ -492,11 +517,11 @@ public class Player : MonoBehaviour
 
     private void SearchNextTarget()
     {
+        // ✅ Aqui é a forma mais consistente com seu projeto,
+        // porque você já tem esse método pronto no TargetManager.
         if (TargetManager.Instance == null) return;
 
-        ITargetable next = TargetManager.Instance.FindNearestTarget(enemyMask, tabSearchRadius);
-        if (next != null)
-            TargetManager.Instance.SetTarget(next);
+        TargetManager.Instance.CycleTargetWithTab(transform.position, tabSearchRadius);
     }
 
     //==========================================================
@@ -607,6 +632,23 @@ public class Player : MonoBehaviour
         RaiseXPChanged();
     }
 
+    // ==========================================================
+    // RUNA DA COMPATIBILIDADE ANCESTRAL (XP)
+    // ----------------------------------------------------------
+    // Alguns pergaminhos antigos (ex: Enemy.cs) ainda invocam
+    // o método GainXP(). Em versões mais novas, o nome evoluiu
+    // para AddXP().
+    //
+    // Para NÃO quebrar o mundo e manter a arquitetura atual,
+    // mantemos GainXP() como um "portal" para AddXP().
+    // ==========================================================
+    public void GainXP(int amount)
+    {
+        // Portal arcano: mesmo efeito, novo nome por baixo.
+        AddXP(amount);
+    }
+
+
     private void LevelUp()
     {
         level++;
@@ -620,6 +662,20 @@ public class Player : MonoBehaviour
 
         RaiseHealthChanged();
         RaiseManaChanged();
+
+        // ==========================================================
+        // RUNA DA ASCENSÃO
+        // ----------------------------------------------------------
+        // Após todos os cálculos de nível, XP e restauração,
+        // notificamos o mundo:
+        // "O mago evoluiu."
+        //
+        // O HUD escuta.
+        // Sistemas futuros podem escutar.
+        // O Player não precisa saber quem escuta.
+        // ==========================================================
+        OnLevelChanged?.Invoke(level);
+
     }
 
     //==========================================================
@@ -640,4 +696,19 @@ public class Player : MonoBehaviour
     {
         OnXPChanged?.Invoke(currentXP, xpToNextLevel);
     }
+
+    // ==========================================================
+    // RUNA DO DESPERTAR DE NÍVEL
+    // ----------------------------------------------------------
+    // Este evento é observado pelo HUD e outros sistemas
+    // que precisam reagir quando o Player sobe de nível.
+    //
+    // ⚠️ Importante:
+    // Mesmo que o Player funcione sem ele,
+    // outros scripts JÁ ESPERAM essa runa existir.
+    // Removê-la quebra o contrato arcano do sistema.
+    // ==========================================================
+    public event Action<int> OnLevelChanged;
+
+
 }
