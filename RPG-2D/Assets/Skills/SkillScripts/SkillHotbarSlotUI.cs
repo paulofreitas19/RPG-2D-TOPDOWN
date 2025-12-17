@@ -66,7 +66,7 @@ public class SkillHotbarSlotUI : MonoBehaviour
 
         readyGlow.SetActive(true);
         CancelInvoke(nameof(HideGlow));
-        Invoke(nameof(HideGlow), 0.35f);
+        Invoke(nameof(HideGlow), 0.02f);
     }
 
     private void HideGlow()

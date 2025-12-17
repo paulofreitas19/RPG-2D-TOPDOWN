@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: FireBall
   m_EditorClassIdentifier: Assembly-CSharp::FireBallSkill
   skillName: FireBall
-  cooldown: 0
+  cooldown: 3
   castTime: 1.2
   manaCost: 20
   targetType: 0
