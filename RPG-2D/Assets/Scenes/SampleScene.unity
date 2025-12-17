@@ -2089,6 +2089,7 @@ GameObject:
   - component: {fileID: 1002029038}
   - component: {fileID: 1002029040}
   - component: {fileID: 1002029039}
+  - component: {fileID: 1002029041}
   m_Layer: 5
   m_Name: FireBall
   m_TagString: Untagged
@@ -2153,6 +2154,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1002029037}
   m_CullTransparentMesh: 1
+--- !u!114 &1002029041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1002029037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2eb22fdf9c38654e9daac30c841b4ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillHotbarSlotUI
+  caster: {fileID: 1068883257}
+  skill: {fileID: 11400000, guid: 8beb6443b18eeca47b678d77637e16d3, type: 2}
+  icon: {fileID: 1002029039}
+  iconGroup: {fileID: 0}
+  cooldownOverlay: {fileID: 0}
+  readyGlow: {fileID: 0}
+  cooldownOpacity: 0.35
 --- !u!1 &1037935064
 GameObject:
   m_ObjectHideFlags: 0
@@ -2633,7 +2653,7 @@ RectTransform:
   m_GameObject: {fileID: 1201711538}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.7173104, y: 0.7173104, z: 0.7173104}
+  m_LocalScale: {x: 0.8209278, y: 0.8209278, z: 0.8209278}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 347861646}
@@ -2645,7 +2665,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -3.8673, y: 135.6}
+  m_AnchoredPosition: {x: -4.2818, y: 121}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1201711540
@@ -3161,6 +3181,7 @@ GameObject:
   - component: {fileID: 1627175917}
   - component: {fileID: 1627175919}
   - component: {fileID: 1627175918}
+  - component: {fileID: 1627175920}
   m_Layer: 5
   m_Name: BasicAttack
   m_TagString: Untagged
@@ -3225,6 +3246,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1627175916}
   m_CullTransparentMesh: 1
+--- !u!114 &1627175920
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1627175916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2eb22fdf9c38654e9daac30c841b4ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillHotbarSlotUI
+  caster: {fileID: 1068883257}
+  skill: {fileID: 0}
+  icon: {fileID: 0}
+  iconGroup: {fileID: 0}
+  cooldownOverlay: {fileID: 0}
+  readyGlow: {fileID: 0}
+  cooldownOpacity: 0.35
 --- !u!1 &1654428708
 GameObject:
   m_ObjectHideFlags: 0

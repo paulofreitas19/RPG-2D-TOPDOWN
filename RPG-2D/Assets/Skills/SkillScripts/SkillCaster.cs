@@ -1,4 +1,6 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -9,11 +11,13 @@ using UnityEngine;
 /// - Decidir se precisa se aproximar
 /// - Controlar locks corretos no Player
 /// - Executar o cast no momento certo
+/// - Gerenciar COOLDOWN (runtime) das skills
 /// 
 /// Importante:
 /// - NÃO movimenta diretamente (delegado ao Player)
 /// - NÃO aplica lógica de input
 /// - NÃO decide dano (isso é da Skill)
+/// - NÃO guarda cooldown no Player (estado é da skill em uso)
 /// </summary>
 public class SkillCaster : MonoBehaviour
 {
@@ -34,6 +38,21 @@ public class SkillCaster : MonoBehaviour
     // ==========================================================
 
     private bool isBusy = false; // true durante approach OU cast
+
+    // ==========================================================
+    //  COOLDOWN RUNTIME (estado do uso da skill)
+    // ==========================================================
+
+    // Armazena quando cada skill estará pronta novamente
+    // key   → SkillBase
+    // value → Time.time em que o cooldown termina
+    private readonly Dictionary<SkillBase, float> nextReadyTime = new();
+
+    /// <summary>
+    /// Disparado quando uma skill entra em cooldown.
+    /// Útil para HUD dar feedback imediato (opacity, fill, etc).
+    /// </summary>
+    public event Action<SkillBase, float> OnCooldownStarted;
 
     private void Awake()
     {
@@ -74,6 +93,10 @@ public class SkillCaster : MonoBehaviour
 
         // 🔒 Se o Player já está castando algo, não inicia outro fluxo
         if (player.IsCasting) return;
+
+        // 🔒 Gate de cooldown
+        if (IsOnCooldown(skill))
+            return;
 
         Transform finalTarget = ResolveTarget(skill, target);
         if (finalTarget == null) return;
@@ -151,6 +174,16 @@ public class SkillCaster : MonoBehaviour
 
     private IEnumerator Cast(SkillBase skill, Transform target)
     {
+        // ✅ Checagem de mana (antes do hard lock, para evitar travar à toa)
+        if (skill.manaCost > 0)
+        {
+            if (!player.TryConsumeMana(skill.manaCost))
+                yield break;
+        }
+
+        // ⏱️ Início do cooldown (cast REAL começou)
+        StartCooldown(skill);
+
         // 🔒 Agora sim: hard lock total (para movimento)
         player.BeginExternalCastLock();
 
@@ -177,6 +210,50 @@ public class SkillCaster : MonoBehaviour
 
         // 🔓 Libera hard lock
         player.EndExternalCastLock();
+    }
+
+    // ==========================================================
+    //  COOLDOWN — API PARA HUD / SISTEMAS
+    // ==========================================================
+
+    /// <summary>
+    /// Retorna quanto tempo falta para a skill sair do cooldown.
+    /// </summary>
+    public float GetCooldownRemaining(SkillBase skill)
+    {
+        if (skill == null) return 0f;
+        if (!nextReadyTime.TryGetValue(skill, out float readyAt)) return 0f;
+        return Mathf.Max(0f, readyAt - Time.time);
+    }
+
+    /// <summary>
+    /// Retorna a duração total do cooldown da skill.
+    /// </summary>
+    public float GetCooldownDuration(SkillBase skill)
+    {
+        return skill != null ? Mathf.Max(0f, skill.cooldown) : 0f;
+    }
+
+    /// <summary>
+    /// Indica se a skill está atualmente em cooldown.
+    /// </summary>
+    public bool IsOnCooldown(SkillBase skill)
+    {
+        return GetCooldownRemaining(skill) > 0f;
+    }
+
+    /// <summary>
+    /// Registra o início do cooldown de uma skill.
+    /// </summary>
+    private void StartCooldown(SkillBase skill)
+    {
+        float cd = Mathf.Max(0f, skill.cooldown);
+        if (cd <= 0f) return;
+
+        float readyAt = Time.time + cd;
+        nextReadyTime[skill] = readyAt;
+
+        OnCooldownStarted?.Invoke(skill, cd);
     }
 
     // ==========================================================

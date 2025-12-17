@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: FireBall
   m_EditorClassIdentifier: Assembly-CSharp::FireBallSkill
   skillName: FireBall
+  cooldown: 0
   castTime: 1.2
+  manaCost: 20
   targetType: 0
   castRange: 10
   skillPrefab: {fileID: 9143907712053440600, guid: c8afb65e9b5d37243ba2b3bd54c15d30, type: 3}

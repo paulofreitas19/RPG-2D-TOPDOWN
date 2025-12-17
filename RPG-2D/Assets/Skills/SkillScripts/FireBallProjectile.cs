@@ -30,8 +30,19 @@ public class FireBallProjectile : MonoBehaviour
 
     private void OnHitTarget()
     {
+        if (hasHit) return;
         hasHit = true;
         isLaunched = false;
+
+        // 🔥 APLICAR DANO REAL AO ALVO
+        if (target != null)
+        {
+            ITargetable targetable = target.GetComponent<ITargetable>();
+            if (targetable != null && targetable.IsAlive)
+            {
+                targetable.TakeDamage(Mathf.RoundToInt(damage));
+            }
+        }
 
         // 🛑 Desativa colisão — não é mais um projétil
         Collider2D col = GetComponent<Collider2D>();
@@ -48,6 +59,7 @@ public class FireBallProjectile : MonoBehaviour
         // 🔥 Destroi após a animação
         Destroy(gameObject, destroyAfter);
     }
+
 
 
     private void Update()

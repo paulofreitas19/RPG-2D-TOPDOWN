@@ -12,8 +12,14 @@ public abstract class SkillBase : ScriptableObject
     [Header("Identificação")]
     public string skillName;
 
+    [Header("Cooldown")]
+    [Min(0f)] public float cooldown = 0f;
+
     [Header("Tempo")]
     public float castTime;
+
+    [Header("Custo")]
+    [Min(0)] public int manaCost = 0;
 
     [Header("Alvo")]
     public SkillTargetType targetType = SkillTargetType.TargetRequired;

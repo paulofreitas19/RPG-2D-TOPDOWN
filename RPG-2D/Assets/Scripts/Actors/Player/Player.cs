@@ -789,6 +789,16 @@ public class Player : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Tenta consumir mana. Retorna true se conseguiu.
+    /// (Método público para sistemas externos como SkillCaster.)
+    /// </summary>
+    public bool TryConsumeMana(int amount)
+    {
+        return ConsumeMana(amount);
+    }
+
+
     public void RestoreMana(int amount)
     {
         if (amount <= 0) return;

@@ -33,10 +33,10 @@ public class Enemy : MonoBehaviour, ITargetable
 
     [Header("Morte Visual")]
     [Tooltip("Tempo da animação de morte (clip 'Die'). Ajuste para casar com o Animation Clip.")]
-    [SerializeField] private float deathAnimDuration = 0.4f;   // Quanto tempo dura o clip Die.
+    [SerializeField] private float deathAnimDuration = 0.6f;   // Quanto tempo dura o clip Die.
 
     [Tooltip("Tempo do efeito de fade para o inimigo sumir após morrer.")]
-    [SerializeField] private float fadeOutDuration = 0.6f;     // Quanto tempo leva para desaparecer.
+    [SerializeField] private float fadeOutDuration = 0.4f;     // Quanto tempo leva para desaparecer.
 
     // -------------------------------------------------------------
     //  IMPLEMENTAÇÃO DA INTERFACE ITargetable
