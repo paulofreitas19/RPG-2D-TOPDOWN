@@ -116,6 +116,16 @@ public class Player : MonoBehaviour
     [SerializeField] private int xpToNextLevel = 50;
     private int currentXP;
 
+    [Header("Idle Especial")]
+    [SerializeField] private float idleDelay = 5f;
+
+    // ✅ (ADIÇÃO) Duração do clip idle especial (para Unlock sem AnimationEvent)
+    // Ajuste no Inspector conforme a duração real do seu clip "idle" especial.
+    [SerializeField] private float idleSpecialClipDuration = 1.0f;
+
+    private float nextIdleSpecialAt;
+    private Coroutine idleSpecialRoutine;
+
     public int Level => level;
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
@@ -184,6 +194,9 @@ public class Player : MonoBehaviour
         StopBasicAttack();
         pendingSkill = null;
         pendingSkillTarget = null;
+
+        // ✅ (ADIÇÃO) Approach externo é “ação do jogo”: reseta idle especial e interrompe se estiver tocando.
+        RegisterPlayerAction();
     }
 
     /// <summary>
@@ -226,6 +239,7 @@ public class Player : MonoBehaviour
 
     private void Start()
     {
+        nextIdleSpecialAt = Time.time + idleDelay; // começa a contar do início do jogo
         RaiseHealthChanged();
         RaiseManaChanged();
         RaiseXPChanged();
@@ -242,6 +256,8 @@ public class Player : MonoBehaviour
         HandleTargetKeepAlive();
 
         UpdateCombatMode();
+
+        CheckIdleSpecial();
     }
 
     private void FixedUpdate()
@@ -309,6 +325,9 @@ public class Player : MonoBehaviour
     {
         if (isCasting) return;
         LockCasting();
+
+        // ✅ (ADIÇÃO) Cast externo é ação: reseta idle especial e interrompe se estiver tocando.
+        RegisterPlayerAction();
     }
 
     /// <summary>
@@ -321,6 +340,72 @@ public class Player : MonoBehaviour
     {
         if (!isCasting) return;
         UnlockCasting();
+    }
+
+    /// <summary>
+    /// Deve ser chamado sempre que o jogador realiza QUALQUER ação.
+    /// Reseta o contador de idle especial.
+    /// </summary>
+    private void RegisterPlayerAction()
+    {
+        // Reinicia o “relógio” do idle especial
+        nextIdleSpecialAt = Time.time + idleDelay;
+
+        // Se estava tocando idle especial, interrompe imediatamente
+        if (playerAnim != null && playerAnim.IsIdleSpecialLocked)
+        {
+            float speedMag = rb.linearVelocity.magnitude;
+            playerAnim.ForceExitIdleSpecial(speedMag);
+        }
+
+        // Se havia coroutine de unlock rodando, cancela
+        if (idleSpecialRoutine != null)
+        {
+            StopCoroutine(idleSpecialRoutine);
+            idleSpecialRoutine = null;
+        }
+    }
+
+    private void CheckIdleSpecial()
+    {
+        // Se está castando, não dispara
+        if (IsCasting)
+            return;
+
+        // Se está se movendo, não dispara
+        if (rb.linearVelocity.sqrMagnitude > 0.01f)
+            return;
+
+        // Se ainda não chegou a hora, não dispara
+        if (Time.time < nextIdleSpecialAt)
+            return;
+
+        // Se já está no idle especial, não dispara de novo
+        if (playerAnim != null && playerAnim.IsIdleSpecialLocked)
+            return;
+
+        // Dispara o idle especial (1x)
+        if (playerAnim != null)
+            playerAnim.PlayIdleSpecial();
+
+        // Agenda o próximo disparo para +5s (mesmo sem ação)
+        nextIdleSpecialAt = Time.time + idleDelay;
+
+        // Agenda unlock do lock visual após o tempo do clip
+        if (playerAnim != null)
+            idleSpecialRoutine = StartCoroutine(UnlockIdleSpecialAfterAnim());
+    }
+
+    private IEnumerator UnlockIdleSpecialAfterAnim()
+    {
+        // Coloque aqui a duração REAL do seu clip idle especial:
+        // ✅ (ADIÇÃO) Agora configurável no Inspector (idleSpecialClipDuration).
+        yield return new WaitForSeconds(idleSpecialClipDuration);
+
+        if (playerAnim != null)
+            playerAnim.UnlockIdleSpecial();
+
+        idleSpecialRoutine = null;
     }
 
     //==========================================================
@@ -345,6 +430,10 @@ public class Player : MonoBehaviour
 
         if (Input.GetMouseButtonDown(0))
         {
+            // ✅ (ADIÇÃO) Qualquer clique do jogador é ação:
+            // reseta contador do idle especial e interrompe se estiver tocando.
+            RegisterPlayerAction();
+
             // ==========================================================
             // RUNA ANTI-BUG (NÃO targetar por HOVER)
             // ----------------------------------------------------------
@@ -422,6 +511,9 @@ public class Player : MonoBehaviour
         // Ataque básico pelo slot (F1), se quiser:
         if (basicAttack != null && Input.GetKeyDown(basicAttack.key))
         {
+            // ✅ (ADIÇÃO) Hotkey é ação do jogador:
+            RegisterPlayerAction();
+
             TryUseSkillOnTarget(basicAttack);
             return;
         }
@@ -433,6 +525,9 @@ public class Player : MonoBehaviour
             {
                 if (s != null && Input.GetKeyDown(s.key))
                 {
+                    // ✅ (ADIÇÃO) Hotkey é ação do jogador:
+                    RegisterPlayerAction();
+
                     TryUseSkillOnTarget(s);
                     return;
                 }
@@ -598,6 +693,11 @@ public class Player : MonoBehaviour
     {
         if (isCasting)
             return;
+
+        // ✅ (ADIÇÃO) Movimento (mesmo iniciado por sistema externo) é uma ação que deve:
+        // - interromper idle especial se estiver tocando
+        // - resetar o relógio para não disparar idle durante intenção de movimento
+        RegisterPlayerAction();
 
         isAutoMoving = true;
         moveDestination = destination;

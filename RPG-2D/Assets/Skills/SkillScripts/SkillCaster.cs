@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using static UnityEngine.GraphicsBuffer;
 
 /// <summary>
 /// SkillCaster é o ORQUESTRADOR de skills baseadas em ScriptableObject.
@@ -277,36 +278,40 @@ public class SkillCaster : MonoBehaviour
         if (skill.targetType == SkillBase.SkillTargetType.Self)
             return transform;
 
-        // Se já veio explícito, usa
-        if (explicitTarget != null)
-            return explicitTarget;
-
-        // Caso contrário, tenta TargetManager
-        if (TargetManager.Instance == null)
-            return null;
-
-        ITargetable current = TargetManager.Instance.CurrentTarget;
-
-        // Target obrigatório
+        // ==========================================================
+        // 🔒 REGRA ABSOLUTA:
+        // Se a skill exige target, usamos EXCLUSIVAMENTE
+        // o TargetManager (target manual do jogador).
+        // ==========================================================
         if (skill.targetType == SkillBase.SkillTargetType.TargetRequired)
         {
+            if (TargetManager.Instance == null)
+                return null;
+
+            ITargetable current = TargetManager.Instance.CurrentTarget;
             if (current == null || !current.IsAlive)
                 return null;
 
             return current.TargetTransform;
         }
 
-        // Optional → se não tem alvo, conjura em si
+        // Optional → só usa explicitTarget se não houver target manual
         if (skill.targetType == SkillBase.SkillTargetType.Optional)
         {
-            if (current != null && current.IsAlive)
-                return current.TargetTransform;
+            if (TargetManager.Instance != null)
+            {
+                var current = TargetManager.Instance.CurrentTarget;
+                if (current != null && current.IsAlive)
+                    return current.TargetTransform;
+            }
 
-            return transform;
+            return explicitTarget != null ? explicitTarget : transform;
         }
 
         return null;
     }
+
+
 
     // ==========================================================
     //  ORIENTAÇÃO VISUAL

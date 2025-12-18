@@ -751,7 +751,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 230
+    m_FontSize: 234
     m_FontStyle: 3
     m_BestFit: 0
     m_MinSize: 1
@@ -830,11 +830,11 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 250
+    m_FontSize: 285
     m_FontStyle: 3
     m_BestFit: 0
     m_MinSize: 1
-    m_MaxSize: 250
+    m_MaxSize: 300
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -1758,11 +1758,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1956578250095529054, guid: 8fbdeb8b785c0414b877c4eb3566fd09, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -8.78
+      value: -2.03
       objectReference: {fileID: 0}
     - target: {fileID: 1956578250095529054, guid: 8fbdeb8b785c0414b877c4eb3566fd09, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.54
+      value: -2.98
       objectReference: {fileID: 0}
     - target: {fileID: 1956578250095529054, guid: 8fbdeb8b785c0414b877c4eb3566fd09, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2444,6 +2444,8 @@ MonoBehaviour:
   currentMana: 0
   level: 1
   xpToNextLevel: 50
+  idleDelay: 10
+  idleSpecialClipDuration: 3.5
   combatTimeout: 5
 --- !u!114 &1068883257
 MonoBehaviour:
@@ -2712,7 +2714,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 170
+    m_FontSize: 200
     m_FontStyle: 3
     m_BestFit: 0
     m_MinSize: 1
@@ -3728,11 +3730,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1956578250095529054, guid: 8fbdeb8b785c0414b877c4eb3566fd09, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -2.5
+      value: 0.08
       objectReference: {fileID: 0}
     - target: {fileID: 1956578250095529054, guid: 8fbdeb8b785c0414b877c4eb3566fd09, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -2.15
+      value: -0.71
       objectReference: {fileID: 0}
     - target: {fileID: 1956578250095529054, guid: 8fbdeb8b785c0414b877c4eb3566fd09, type: 3}
       propertyPath: m_LocalPosition.z
