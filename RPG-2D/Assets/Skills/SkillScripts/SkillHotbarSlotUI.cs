@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class SkillHotbarSlotUI : MonoBehaviour
 {
@@ -18,6 +19,12 @@ public class SkillHotbarSlotUI : MonoBehaviour
 
     private bool wasOnCooldown = false;
 
+    private Coroutine glowRoutine;
+
+    [Header("Mana Feedback")]
+    [SerializeField] private Color noManaColor = new Color(1f, 0.3f, 0.3f, 1f);
+    [SerializeField] private Color normalColor = Color.white;
+
     private void Awake()
     {
         if (readyGlow != null) readyGlow.SetActive(false);
@@ -33,6 +40,17 @@ public class SkillHotbarSlotUI : MonoBehaviour
 
         bool onCd = remaining > 0f;
 
+        bool hasMana = caster.HasManaFor(skill);
+
+        if (!hasMana)
+        {
+            icon.color = noManaColor;
+        }
+        else
+        {
+            icon.color = normalColor;
+        }
+
         // Opacidade do ícone
         if (iconGroup != null)
             iconGroup.alpha = onCd ? cooldownOpacity : 1f;
@@ -45,6 +63,7 @@ public class SkillHotbarSlotUI : MonoBehaviour
                 float t = Mathf.Clamp01(remaining / duration);
                 cooldownOverlay.fillAmount = t; // cheio no começo, esvaziando
             }
+
             else
             {
                 cooldownOverlay.fillAmount = 0f;
@@ -64,10 +83,31 @@ public class SkillHotbarSlotUI : MonoBehaviour
     {
         if (readyGlow == null) return;
 
-        readyGlow.SetActive(true);
-        CancelInvoke(nameof(HideGlow));
-        Invoke(nameof(HideGlow), 0.02f);
+        // Evita múltiplas corrotinas rodando
+        if (glowRoutine != null)
+            StopCoroutine(glowRoutine);
+
+        glowRoutine = StartCoroutine(ReadyGlowPulse());
     }
+
+    private IEnumerator ReadyGlowPulse()
+    {
+        const int pulses = 2;
+        const float onTime = 0.03f;
+        const float offTime = 0.03f;
+
+        for (int i = 0; i < pulses; i++)
+        {
+            readyGlow.SetActive(true);
+            yield return new WaitForSeconds(onTime);
+
+            readyGlow.SetActive(false);
+            yield return new WaitForSeconds(offTime);
+        }
+
+        glowRoutine = null;
+    }
+
 
     private void HideGlow()
     {

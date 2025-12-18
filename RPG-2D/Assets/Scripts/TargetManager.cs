@@ -9,7 +9,7 @@ using System;
 /// - Ele NÃO é o Player.
 /// - Ele NÃO movimenta.
 /// - Ele NÃO ataca.
-/// 
+///
 /// Ele só mantém e troca o target com consistência.
 /// </summary>
 public class TargetManager : MonoBehaviour
@@ -17,11 +17,26 @@ public class TargetManager : MonoBehaviour
     // Singleton.
     public static TargetManager Instance { get; private set; }
 
-    /// <summary>Alvo atual.</summary>
+    /// <summary>Alvo atual (fonte de verdade).</summary>
     public ITargetable CurrentTarget { get; private set; }
 
     /// <summary>Evento disparado ao trocar de alvo.</summary>
     public event Action<ITargetable> OnTargetChanged;
+
+    // ==========================================================
+    // RUNA DA INTENÇÃO (Manual vs Auto)
+    // ----------------------------------------------------------
+    // Quando o player ESCOLHE um alvo (clique/TAB), isso é "manual".
+    // Sistemas automáticos (auto-aim, auto-select, etc.) NÃO devem
+    // sobrescrever esse alvo, a menos que o manual seja limpo.
+    // ==========================================================
+    private bool hasManualTarget = false;
+
+    /// <summary>
+    /// True quando o alvo atual foi definido manualmente pelo jogador.
+    /// Útil para depuração e para impedir sobrescrita por sistemas automáticos.
+    /// </summary>
+    public bool HasManualTarget => hasManualTarget;
 
     private void Awake()
     {
@@ -36,8 +51,15 @@ public class TargetManager : MonoBehaviour
         DontDestroyOnLoad(gameObject); // Opcional.
     }
 
-    /// <summary>Define um novo alvo.</summary>
-    public void SetTarget(ITargetable target)
+    // ==========================================================
+    // RUNA CENTRAL: Aplicação do Target (privada)
+    // ----------------------------------------------------------
+    // Mantém a troca de alvo sempre consistente:
+    // - Atualiza CurrentTarget
+    // - Dispara evento
+    // - Evita duplicação de lógica em múltiplos métodos
+    // ==========================================================
+    private void ApplyTarget(ITargetable target)
     {
         if (CurrentTarget == target)
             return;
@@ -46,14 +68,63 @@ public class TargetManager : MonoBehaviour
         OnTargetChanged?.Invoke(CurrentTarget);
     }
 
-    /// <summary>Limpa o alvo atual.</summary>
+    /// <summary>
+    /// Define um novo alvo (modo "auto/sistema").
+    /// 
+    /// Regra:
+    /// - Se existe um alvo manual vivo, NÃO sobrescrevemos.
+    /// - Assim evitamos "troca automática de target" depois que o jogador escolheu.
+    /// </summary>
+    public void SetTarget(ITargetable target)
+    {
+        // Se o jogador escolheu manualmente um alvo e ele ainda é válido,
+        // não deixamos sistemas automáticos sobrescreverem.
+        if (hasManualTarget && CurrentTarget != null && CurrentTarget.IsAlive)
+            return;
+
+        // Se o target é inválido, tratamos como limpar alvo.
+        if (target != null && !target.IsAlive)
+            target = null;
+
+        // Como isso veio do "auto/sistema", manual fica falso.
+        hasManualTarget = false;
+        ApplyTarget(target);
+    }
+
+    /// <summary>
+    /// Define um novo alvo manual (clique / TAB).
+    /// 
+    /// Regra:
+    /// - Manual SEMPRE prevalece.
+    /// - Dispara evento e atualiza CurrentTarget (fonte de verdade).
+    /// </summary>
+    public void SetManualTarget(ITargetable target)
+    {
+        if (target == null || !target.IsAlive)
+        {
+            // Se tentou setar manual inválido, limpamos tudo.
+            ClearTarget();
+            return;
+        }
+
+        hasManualTarget = true;
+        ApplyTarget(target);
+    }
+
+    /// <summary>
+    /// Limpa o alvo atual (também limpa o "manual").
+    /// </summary>
     public void ClearTarget()
     {
         if (CurrentTarget == null)
+        {
+            // Mesmo sem alvo, garantimos consistência do estado manual
+            hasManualTarget = false;
             return;
+        }
 
-        CurrentTarget = null;
-        OnTargetChanged?.Invoke(null);
+        hasManualTarget = false;
+        ApplyTarget(null);
     }
 
     /// <summary>
@@ -77,6 +148,12 @@ public class TargetManager : MonoBehaviour
 
         // Procuramos um collider inimigo naquele ponto.
         Collider2D hit = Physics2D.OverlapPoint(mouseWorld, enemyMask);
+
+        if (hit != null)
+        {
+            Debug.Log($"[TargetManager] Hit: {hit.name} | Layer: {LayerMask.LayerToName(hit.gameObject.layer)}");
+        }
+
         if (hit == null)
             return null;
 
@@ -124,13 +201,16 @@ public class TargetManager : MonoBehaviour
         // Se não há alvo, pega o primeiro.
         if (CurrentTarget == null)
         {
-            SetTarget(targets[0]);
+            // TAB é intenção do jogador -> manual.
+            SetManualTarget(targets[0]);
             return;
         }
 
         // Senão, pega o próximo depois do atual.
         int index = targets.IndexOf(CurrentTarget);
         index = (index + 1) % targets.Count;
-        SetTarget(targets[index]);
+
+        // TAB é intenção do jogador -> manual.
+        SetManualTarget(targets[index]);
     }
 }

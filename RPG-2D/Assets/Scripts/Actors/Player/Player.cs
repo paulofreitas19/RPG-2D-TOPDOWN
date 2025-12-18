@@ -109,7 +109,7 @@ public class Player : MonoBehaviour
 
     [Header("Mana")]
     [SerializeField] private int maxMana = 100;
-    private int currentMana;
+    [SerializeField] private int currentMana;
 
     [Header("XP / Level")]
     [SerializeField] private int level = 1;
@@ -219,7 +219,6 @@ public class Player : MonoBehaviour
         if (spriteFlipper == null)
             spriteFlipper = GetComponentInChildren<SpriteFlipper>();
 
-
         currentHealth = maxHealth;
         currentMana = maxMana;
         currentXP = 0;
@@ -305,17 +304,6 @@ public class Player : MonoBehaviour
     /// Usado por sistemas externos (ex: SkillCaster)
     /// para informar ao Player:
     /// "Você está conjurando uma magia agora".
-    ///
-    /// Internamente, isso ativa os mesmos selos usados
-    /// pelo cast interno do Player:
-    /// - bloqueia movimento
-    /// - bloqueia input
-    /// - bloqueia spam de skills
-    ///
-    /// Importante:
-    /// - Não expõe flags
-    /// - Não permite estados inválidos
-    /// - Apenas delega para LockCasting()
     /// </summary>
     public void BeginExternalCastLock()
     {
@@ -328,15 +316,12 @@ public class Player : MonoBehaviour
     /// ----------------------------------------------------------
     /// Libera o Player após o término do cast iniciado
     /// por sistemas externos (SkillCaster).
-    ///
-    /// Quebra os mesmos selos ativados no BeginExternalCastLock().
     /// </summary>
     public void EndExternalCastLock()
     {
         if (!isCasting) return;
         UnlockCasting();
     }
-
 
     //==========================================================
     //  INPUT (Mouse)
@@ -346,28 +331,31 @@ public class Player : MonoBehaviour
     {
         // 🔒 Selo de Controle Externo (Approach Lock):
         // Durante aproximação automática iniciada por sistemas externos (SkillCaster),
-        // ignoramos inputs do jogador (clique, TAB, hotkeys) para não quebrar o fluxo.
+        // ignoramos inputs do jogador para não quebrar o fluxo.
         if (externalInputLock)
             return;
 
-        // 🔒 Selo do Movimento:
-        // Enquanto castando, ignoramos clique no chão para mover.
-        // (Mas ainda permitimos clicar em inimigo para targetar se você quiser.)
+        // 🔒 Enquanto castando: bloqueamos TAB e bloqueamos mover no chão,
+        // mas ainda permitimos clique em inimigo para escolher target (apenas target).
         if (isCasting)
         {
-            // TAB também não deve trocar alvo durante cast (evita mudanças de intenção no meio da conjuração)
             if (Input.GetKeyDown(KeyCode.Tab))
                 return;
-
-            // Clique no chão durante cast não deve fazer nada:
-            // ignoramos apenas a parte de "mover".
-            // Ainda assim, deixamos o clique em inimigo funcionar (target apenas), caso você goste desse comportamento.
         }
 
         if (Input.GetMouseButtonDown(0))
         {
-            // Clique em inimigo?
-            // 🧙‍♂️ Agora esse feitiço realmente existe no TargetManager (e é responsabilidade dele).
+            // ==========================================================
+            // RUNA ANTI-BUG (NÃO targetar por HOVER)
+            // ----------------------------------------------------------
+            // Antes havia um trecho que chamava GetTargetUnderMouse()
+            // todo frame e já setava SetManualTarget(...) sem clique.
+            //
+            // Isso causava a "troca automática de target" quando o mouse
+            // passava por outro inimigo.
+            //
+            // Agora a captura do alvo sob o mouse acontece APENAS no clique.
+            // ==========================================================
             ITargetable clicked = TargetManager.Instance != null
                 ? TargetManager.Instance.GetTargetUnderMouse(enemyMask)
                 : null;
@@ -384,8 +372,9 @@ public class Player : MonoBehaviour
 
             if (clicked != null)
             {
+                // ✅ Clique é intenção do jogador -> alvo MANUAL
                 if (TargetManager.Instance != null)
-                    TargetManager.Instance.SetTarget(clicked);
+                    TargetManager.Instance.SetManualTarget(clicked);
 
                 // 🔒 Durante cast, não iniciamos auto-attack (senão vira “spam de loop”).
                 if (!isCasting && isDoubleClick)
@@ -423,13 +412,10 @@ public class Player : MonoBehaviour
     private void HandleSkillHotkeys()
     {
         // 🔒 Selo de Controle Externo (Approach Lock):
-        // Durante aproximação automática iniciada por sistemas externos (SkillCaster),
-        // ignoramos hotkeys para não permitir spam/override de intenção.
         if (externalInputLock)
             return;
 
         // 🔒 Selo da Conjuração (anti-spam):
-        // Enquanto castando, ignoramos hotkeys de skills.
         if (isCasting)
             return;
 
@@ -459,7 +445,6 @@ public class Player : MonoBehaviour
         if (slot == null) return;
 
         // 🔒 Anti-spam / hard lock:
-        // Não permite iniciar outra skill se já está em cast.
         if (isCasting) return;
 
         // Cooldown check
@@ -477,8 +462,6 @@ public class Player : MonoBehaviour
         float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
 
         // 🔥 PRIMEIRA RUNA: vira pro alvo IMEDIATAMENTE ao tentar usar.
-        // Mesmo se ainda tiver que andar pra chegar no range, o player já começa
-        // a "se orientar" corretamente.
         FaceTarget(target.TargetTransform.position);
 
         // Se está no alcance → cast agora
@@ -503,50 +486,32 @@ public class Player : MonoBehaviour
 
     private IEnumerator CastAndExecuteSkill(SkillSlot slot, ITargetable target)
     {
-        // Se já estiver castando, não entra (anti-spam).
         if (isCasting) yield break;
 
-        // 🔒 Ativa os 3 selos:
-        // - trava movimento
-        // - trava iniciar outra skill
-        // - estabiliza o estado para o cast
         LockCasting();
 
         // Por segurança, olha pro alvo no instante do início.
         FaceTarget(target.TargetTransform.position);
 
         slot.lastUseTime = Time.time;
-
         RegisterCombatEvent();
 
-        // 🔥 SEGUNDA RUNA: antes de qualquer animação / espera,
-        // garantimos a orientação correta.
         FaceTarget(target.TargetTransform.position);
 
-        // Liga flag de cast no Animator.
         playerAnim.SetCasting(true);
 
-        // Se for ataque básico → dispara trigger.
         if (slot == basicAttack)
             playerAnim.PlayBasicAttack();
 
-        // Espera o tempo de cast.
         yield return new WaitForSeconds(slot.castTime);
 
-        // 🔥 TERCEIRA RUNA: imediatamente ANTES de aplicar o efeito,
-        // vira de novo. Por quê?
-        // - o alvo pode ter andado durante o cast
-        // - o facing pode ter sido alterado por movimento / input
-        // - e seu spawnpoint/offset depende do facing (SpriteFlipper)
         if (target != null)
             FaceTarget(target.TargetTransform.position);
 
-        // Aplica dano se o alvo ainda está vivo.
         if (target != null && target.IsAlive)
         {
             target.TakeDamage(slot.damage);
 
-            // Marca orbs da HUD como "em combate".
             if (enemyHud != null &&
                 TargetManager.Instance != null &&
                 TargetManager.Instance.CurrentTarget == target)
@@ -555,13 +520,10 @@ public class Player : MonoBehaviour
             }
         }
 
-        // Desliga cast no Animator.
         playerAnim.SetCasting(false);
 
-        // 🔓 Quebra os selos no final do cast:
         UnlockCasting();
 
-        // Se essa skill era pendente, limpa.
         if (pendingSkill == slot)
         {
             pendingSkill = null;
@@ -575,8 +537,6 @@ public class Player : MonoBehaviour
 
     private void HandleMovement()
     {
-        // 🔒 Selo do Movimento:
-        // Durante cast, o player NÃO se move.
         if (isCasting)
         {
             rb.linearVelocity = Vector2.zero;
@@ -608,7 +568,6 @@ public class Player : MonoBehaviour
             isAutoMoving = false;
             moveDestination = null;
 
-            // Se estava se aproximando para skill pendente, checa alcance.
             if (pendingSkill != null && pendingSkillTarget != null && pendingSkillTarget.IsAlive)
             {
                 float distToTarget = Vector3.Distance(
@@ -617,10 +576,7 @@ public class Player : MonoBehaviour
 
                 if (distToTarget <= pendingSkill.range)
                 {
-                    // 🔥 RUNA FINAL: no exato instante que entra no alcance,
-                    // vira pro alvo ANTES de iniciar o cast.
                     FaceTargetTransform(pendingSkillTarget.TargetTransform);
-
                     StartCoroutine(CastAndExecuteSkill(pendingSkill, pendingSkillTarget));
                 }
             }
@@ -631,8 +587,6 @@ public class Player : MonoBehaviour
         Vector2 dirNorm = dir.normalized;
         rb.linearVelocity = dirNorm * moveSpeed;
 
-        // 🔮 RUNA DO MOVIMENTO CONSCIENTE
-        // Só vira se realmente estiver se movendo no eixo X
         if (Mathf.Abs(dirNorm.x) > 0.01f)
         {
             Vector3 lookPoint = transform.position + new Vector3(dirNorm.x, 0f, 0f);
@@ -642,8 +596,6 @@ public class Player : MonoBehaviour
 
     public void MoveTo(Vector2 destination)
     {
-        // 🔒 Selo do Movimento:
-        // Se está castando, ignora o comando de movimento.
         if (isCasting)
             return;
 
@@ -655,28 +607,16 @@ public class Player : MonoBehaviour
     //  ORIENTAÇÃO VISUAL (SEM MEXER NO TRANSFORM)
     //==========================================================
 
-    /// <summary>
-    /// Vira o player para olhar para uma posição no mundo.
-    /// IMPORTANTÍSSIMO: aqui não mexemos em scale/transform do Player.
-    /// O flip é responsabilidade do SpriteFlipper (SpriteRenderer.flipX).
-    /// </summary>
     private void FaceTarget(Vector3 worldPos)
     {
-        // 🌙 Ao invés de mexer no scale do Player (teleport arcano),
-        // nós pedimos ao SpriteFlipper para virar o visual e o spawnpoint corretamente.
         if (spriteFlipper != null)
             spriteFlipper.FaceTarget(worldPos);
     }
 
-
-    /// <summary>
-    /// “Versão segura” pra mirar em Transform (alvo),
-    /// reaproveitando o método oficial FaceTarget.
-    /// </summary>
     private void FaceTargetTransform(Transform target)
     {
         if (target == null) return;
-        FaceTarget(target.position); // reaproveita seu método oficial (SpriteFlipper)
+        FaceTarget(target.position);
     }
 
     private void UpdateAnimation()
@@ -719,8 +659,6 @@ public class Player : MonoBehaviour
 
     private void SearchNextTarget()
     {
-        // ✅ Aqui é a forma mais consistente com seu projeto,
-        // porque você já tem esse método pronto no TargetManager.
         if (TargetManager.Instance == null) return;
 
         TargetManager.Instance.CycleTargetWithTab(transform.position, tabSearchRadius);
@@ -736,7 +674,6 @@ public class Player : MonoBehaviour
 
         while (isAutoAttacking)
         {
-            // Se o alvo morreu, encerra
             if (target == null || !target.IsAlive)
             {
                 StopBasicAttack();
@@ -745,17 +682,13 @@ public class Player : MonoBehaviour
 
             float dist = Vector2.Distance(transform.position, target.TargetTransform.position);
 
-            // Se está longe demais → aproximar
             if (dist > basicAttack.range)
             {
                 MoveTo(target.TargetTransform.position);
             }
             else
             {
-                // Está em alcance → ataca
                 yield return CastAndExecuteSkill(basicAttack, target);
-
-                // Cooldown entre ataques automáticos
                 yield return new WaitForSeconds(basicAttack.cooldown);
             }
 
@@ -789,15 +722,10 @@ public class Player : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Tenta consumir mana. Retorna true se conseguiu.
-    /// (Método público para sistemas externos como SkillCaster.)
-    /// </summary>
     public bool TryConsumeMana(int amount)
     {
         return ConsumeMana(amount);
     }
-
 
     public void RestoreMana(int amount)
     {
@@ -812,7 +740,6 @@ public class Player : MonoBehaviour
     //  VIDA / DANO / XP
     //==========================================================
 
-    /// <summary>Receber dano.</summary>
     public void TakeDamage(int amount)
     {
         amount = Mathf.Max(0, amount);
@@ -824,7 +751,6 @@ public class Player : MonoBehaviour
 
         if (currentHealth <= 0)
         {
-            // Morte (você pode expandir isso depois).
             playerAnim.PlayDeath();
         }
     }
@@ -844,49 +770,23 @@ public class Player : MonoBehaviour
         RaiseXPChanged();
     }
 
-    // ==========================================================
-    // RUNA DA COMPATIBILIDADE ANCESTRAL (XP)
-    // ----------------------------------------------------------
-    // Alguns pergaminhos antigos (ex: Enemy.cs) ainda invocam
-    // o método GainXP(). Em versões mais novas, o nome evoluiu
-    // para AddXP().
-    //
-    // Para NÃO quebrar o mundo e manter a arquitetura atual,
-    // mantemos GainXP() como um "portal" para AddXP().
-    // ==========================================================
     public void GainXP(int amount)
     {
-        // Portal arcano: mesmo efeito, novo nome por baixo.
         AddXP(amount);
     }
 
     private void LevelUp()
     {
         level++;
-
-        // Exemplo simples de progressão:
         xpToNextLevel = Mathf.RoundToInt(xpToNextLevel * 1.2f);
 
-        // Recupera um pouco ao upar (opcional)
         currentHealth = maxHealth;
         currentMana = maxMana;
 
         RaiseHealthChanged();
         RaiseManaChanged();
 
-        // ==========================================================
-        // RUNA DA ASCENSÃO
-        // ----------------------------------------------------------
-        // Após todos os cálculos de nível, XP e restauração,
-        // notificamos o mundo:
-        // "O mago evoluiu."
-        //
-        // O HUD escuta.
-        // Sistemas futuros podem escutar.
-        // O Player não precisa saber quem escuta.
-        // ==========================================================
         OnLevelChanged?.Invoke(level);
-
     }
 
     //==========================================================
@@ -908,16 +808,5 @@ public class Player : MonoBehaviour
         OnXPChanged?.Invoke(currentXP, xpToNextLevel);
     }
 
-    // ==========================================================
-    // RUNA DO DESPERTAR DE NÍVEL
-    // ----------------------------------------------------------
-    // Este evento é observado pelo HUD e outros sistemas
-    // que precisam reagir quando o Player sobe de nível.
-    //
-    // ⚠️ Importante:
-    // Mesmo que o Player funcione sem ele,
-    // outros scripts JÁ ESPERAM essa runa existir.
-    // Removê-la quebra o contrato arcano do sistema.
-    // ==========================================================
     public event Action<int> OnLevelChanged;
 }

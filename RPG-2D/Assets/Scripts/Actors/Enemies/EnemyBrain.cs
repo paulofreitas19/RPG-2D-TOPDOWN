@@ -75,7 +75,12 @@ public class EnemyBrain : MonoBehaviour
 
         // Se tiver pontos de patrulha, começamos patrulhando.
         if (patrolPoints != null && patrolPoints.Length > 0)
+        {
+            // 🔮 NOVO: começa em um ponto aleatório
+            patrolIndex = Random.Range(0, patrolPoints.Length);
             state = EnemyState.Patrol;
+        }
+            
         else
             state = EnemyState.Idle;
     }
@@ -182,16 +187,31 @@ public class EnemyBrain : MonoBehaviour
             if (waitTimer >= waitAtPointTime)
             {
                 waitTimer = 0f;
-                patrolIndex++;
-                if (patrolIndex >= patrolPoints.Length)
-                    patrolIndex = 0;
+                patrolIndex = GetRandomPatrolIndex();
             }
         }
+
         else
         {
             // Ainda não chegou no ponto → continua indo.
             movement.MoveTowards(targetPoint.position);
         }
+    }
+
+    private int GetRandomPatrolIndex()
+    {
+        if (patrolPoints.Length <= 1)
+            return 0;
+
+        int newIndex;
+
+        do
+        {
+            newIndex = Random.Range(0, patrolPoints.Length);
+        }
+        while (newIndex == patrolIndex);
+
+        return newIndex;
     }
 
     /// <summary>

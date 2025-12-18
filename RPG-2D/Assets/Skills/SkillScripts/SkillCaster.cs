@@ -104,6 +104,15 @@ public class SkillCaster : MonoBehaviour
         StartCoroutine(ApproachAndCast(skill, finalTarget));
     }
 
+    public bool HasManaFor(SkillBase skill)
+    {
+        if (skill == null) return false;
+        if (player == null) return false;
+
+        return player.CurrentMana >= skill.manaCost;
+    }
+
+
     // ==========================================================
     //  CORE: APROXIMAÇÃO + CAST
     // ==========================================================
